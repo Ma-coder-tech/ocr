@@ -44,12 +44,13 @@
     "chargedCostTotalBeforeMinor": 154505,
     "chargedCostTotalAfterMinor": 1251056,
     "sensitivityBefore": {
-      "TRANSACTION_COUNT_DRIVEN": 1,
+      "MIXED": 1,
       "UNRESOLVED": 10
     },
     "sensitivityAfter": {
-      "TRANSACTION_COUNT_DRIVEN": 3,
-      "UNRESOLVED": 8
+      "FIXED_COST_DRIVEN": 2,
+      "MIXED": 4,
+      "UNRESOLVED": 5
     }
   },
   "statements": [
@@ -1747,7 +1748,7 @@
         "reconcilesToRdTotal": true,
         "duplicateChargeContributionCount": 0,
         "nonFeePrincipalContributionCount": 0,
-        "sensitivityState": "TRANSACTION_COUNT_DRIVEN",
+        "sensitivityState": "MIXED",
         "countDrivenChargeRefs": [
           "economic_charge_032",
           "economic_charge_068",
@@ -1757,8 +1758,19 @@
           "economic_charge_108",
           "economic_charge_109"
         ],
-        "volumeDrivenChargeRefs": [],
-        "fixedCostDrivenChargeRefs": [],
+        "volumeDrivenChargeRefs": [
+          "economic_charge_030",
+          "economic_charge_063",
+          "economic_charge_065",
+          "economic_charge_077",
+          "economic_charge_079",
+          "economic_charge_099",
+          "economic_charge_103",
+          "economic_charge_105"
+        ],
+        "fixedCostDrivenChargeRefs": [
+          "economic_charge_128"
+        ],
         "comparatorInputCount": 0,
         "opportunityOutputCount": 0,
         "savingsOutputCount": 0,
@@ -2658,7 +2670,7 @@
         "reconcilesToRdTotal": true,
         "duplicateChargeContributionCount": 0,
         "nonFeePrincipalContributionCount": 0,
-        "sensitivityState": "TRANSACTION_COUNT_DRIVEN",
+        "sensitivityState": "MIXED",
         "countDrivenChargeRefs": [
           "economic_charge_032",
           "economic_charge_068",
@@ -2668,8 +2680,19 @@
           "economic_charge_108",
           "economic_charge_109"
         ],
-        "volumeDrivenChargeRefs": [],
-        "fixedCostDrivenChargeRefs": [],
+        "volumeDrivenChargeRefs": [
+          "economic_charge_030",
+          "economic_charge_063",
+          "economic_charge_065",
+          "economic_charge_077",
+          "economic_charge_079",
+          "economic_charge_099",
+          "economic_charge_103",
+          "economic_charge_105"
+        ],
+        "fixedCostDrivenChargeRefs": [
+          "economic_charge_128"
+        ],
         "comparatorInputCount": 0,
         "opportunityOutputCount": 0,
         "savingsOutputCount": 0,
@@ -2689,7 +2712,7 @@
         "reconcilesToRdTotal": true,
         "duplicateChargeContributionCount": 0,
         "nonFeePrincipalContributionCount": 0,
-        "sensitivityState": "TRANSACTION_COUNT_DRIVEN",
+        "sensitivityState": "MIXED",
         "countDrivenChargeRefs": [
           "economic_charge_032",
           "economic_charge_068",
@@ -2699,8 +2722,19 @@
           "economic_charge_108",
           "economic_charge_109"
         ],
-        "volumeDrivenChargeRefs": [],
-        "fixedCostDrivenChargeRefs": [],
+        "volumeDrivenChargeRefs": [
+          "economic_charge_030",
+          "economic_charge_063",
+          "economic_charge_065",
+          "economic_charge_077",
+          "economic_charge_079",
+          "economic_charge_099",
+          "economic_charge_103",
+          "economic_charge_105"
+        ],
+        "fixedCostDrivenChargeRefs": [
+          "economic_charge_128"
+        ],
         "comparatorInputCount": 0,
         "opportunityOutputCount": 0,
         "savingsOutputCount": 0,
@@ -4795,10 +4829,22 @@
         "reconcilesToRdTotal": true,
         "duplicateChargeContributionCount": 0,
         "nonFeePrincipalContributionCount": 0,
-        "sensitivityState": "UNRESOLVED",
-        "countDrivenChargeRefs": [],
+        "sensitivityState": "MIXED",
+        "countDrivenChargeRefs": [
+          "economic_charge_028",
+          "economic_charge_030",
+          "economic_charge_066",
+          "economic_charge_070",
+          "economic_charge_084",
+          "economic_charge_085",
+          "economic_charge_086",
+          "economic_charge_098"
+        ],
         "volumeDrivenChargeRefs": [],
-        "fixedCostDrivenChargeRefs": [],
+        "fixedCostDrivenChargeRefs": [
+          "economic_charge_102",
+          "economic_charge_105"
+        ],
         "comparatorInputCount": 0,
         "opportunityOutputCount": 0,
         "savingsOutputCount": 0,
@@ -6658,10 +6704,12 @@
         "reconcilesToRdTotal": true,
         "duplicateChargeContributionCount": 0,
         "nonFeePrincipalContributionCount": 0,
-        "sensitivityState": "UNRESOLVED",
+        "sensitivityState": "FIXED_COST_DRIVEN",
         "countDrivenChargeRefs": [],
         "volumeDrivenChargeRefs": [],
-        "fixedCostDrivenChargeRefs": [],
+        "fixedCostDrivenChargeRefs": [
+          "economic_charge_002"
+        ],
         "comparatorInputCount": 0,
         "opportunityOutputCount": 0,
         "savingsOutputCount": 0,
@@ -6913,10 +6961,12 @@
         "reconcilesToRdTotal": true,
         "duplicateChargeContributionCount": 0,
         "nonFeePrincipalContributionCount": 0,
-        "sensitivityState": "UNRESOLVED",
+        "sensitivityState": "FIXED_COST_DRIVEN",
         "countDrivenChargeRefs": [],
         "volumeDrivenChargeRefs": [],
-        "fixedCostDrivenChargeRefs": [],
+        "fixedCostDrivenChargeRefs": [
+          "economic_charge_008"
+        ],
         "comparatorInputCount": 0,
         "opportunityOutputCount": 0,
         "savingsOutputCount": 0,
@@ -8283,7 +8333,7 @@
         "reconcilesToRdTotal": true,
         "duplicateChargeContributionCount": 0,
         "nonFeePrincipalContributionCount": 0,
-        "sensitivityState": "TRANSACTION_COUNT_DRIVEN",
+        "sensitivityState": "MIXED",
         "countDrivenChargeRefs": [
           "economic_charge_029",
           "economic_charge_063",
@@ -8291,8 +8341,13 @@
           "economic_charge_077",
           "economic_charge_090"
         ],
-        "volumeDrivenChargeRefs": [],
-        "fixedCostDrivenChargeRefs": [],
+        "volumeDrivenChargeRefs": [
+          "economic_charge_087"
+        ],
+        "fixedCostDrivenChargeRefs": [
+          "economic_charge_094",
+          "economic_charge_097"
+        ],
         "comparatorInputCount": 0,
         "opportunityOutputCount": 0,
         "savingsOutputCount": 0,

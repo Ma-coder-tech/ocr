@@ -122,8 +122,8 @@ const fixtureResults: FixtureResult[] = [
   "Governed prohibited/unknown policy states survive normal binding; merchant approval remains unknown.", "The exact admitted policy predicate fact or merchant-specific approval evidence."),
   result("named_offer_coherence_metadata", "DERIVABLE_WITHOUT_INVENTION", standard.report.merchantCommercialFindingShadowProjection.decisions.some((decision) => decision.presentationGroupId.includes("Standard Retail / Storefront")), false, false,
   "Provider, named offer, and product scope survive in the presentation-group identity.", null),
-  result("invalidating_verify_dependency", "ABSENT", standardObservation.observed.invalidatingVerifyDependenciesConstructedByNormalPath === 0, false, false,
-  "The arbitration can consume an invalidating VERIFY dependency, but normal runtime construction does not create one.", "Evidence-bound VERIFY-to-REVIEW relationship construction."),
+  result("invalidating_verify_dependency", "DERIVABLE_WITHOUT_INVENTION", standardObservation.observed.invalidatingVerifyDependenciesConstructedByNormalPath > 0, false, false,
+  "The normal runtime constructs an evidence-bound invalidating VERIFY dependency without granting review or customer action authority.", null),
 ];
 
 const gold = [];
@@ -182,7 +182,7 @@ const evaluation = {
     normalPath: "ParsedDocument -> supported Fiserv parser -> canonical statement analysis -> governed payment knowledge/commercial decomposition -> internal commercial comparison -> merchant permission -> offline report-set arbitration",
     downstreamSyntheticCommercialObjectsUsed: false,
     behaviorCorrection: "Explicit settled-transaction, authorization-attempt, approved-authorization, gateway-transaction, and settled-batch populations are compared as distinct identities and fail closed when incompatible.",
-    normalReportStillUsesFallbackArbitrationContext: true,
+    normalReportStillUsesFallbackArbitrationContext: false,
     customerRoutingChanged: false,
   },
   supportMatrix: RUNTIME_COMMERCIAL_CONTEXT_CAPABILITY_MATRIX_V1,
@@ -199,7 +199,7 @@ const evaluation = {
     runtimePartial: standardObservation.conclusion.runtimePartial,
     runtimeNotReady: standardObservation.conclusion.runtimeNotReady,
     answer: standardObservation.conclusion.answer,
-    plainLanguage: "No component class yet supplies every merchant-action and report-arbitration binding through the normal path. Per-authorization is closest: matched internal arithmetic is real, but public-policy facts, complete same-scope economics/offsets, and first-class arbitration context still gate action. Gateway families remain partial; percentage, fixed-monthly, and episodic chargeback remain fail closed.",
+    plainLanguage: "No component class yet supplies every merchant-action binding through the normal path. Per-authorization now has first-class arbitration context and an evidence-bound invalidating VERIFY dependency, while public-policy facts and complete same-scope economics/offsets still gate action. Gateway families remain partial; percentage, fixed-monthly, and episodic chargeback remain fail closed.",
   },
   gold: {
     statements: gold,

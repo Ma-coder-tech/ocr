@@ -21,24 +21,22 @@
   "corpus": {
     "statementCount": 11,
     "statementsWithObservedActivity": 4,
-    "statementsWithAvailableRdCost": 3,
-    "statementsWithReconciledProfileCost": 3,
+    "statementsWithAvailableRdCost": 11,
+    "statementsWithReconciledProfileCost": 11,
     "statementsWithAnyComparatorInput": 0,
     "canonicalFingerprintInvariantCount": 11,
     "rdFingerprintInvariantCount": 11,
     "profileStateCounts": {
-      "UNAVAILABLE_CURRENT_STATEMENT": 8,
-      "PARTIAL_CURRENT_STATEMENT": 2,
-      "OBSERVED_RECONCILED": 1
+      "PARTIAL_CURRENT_STATEMENT": 5,
+      "OBSERVED_RECONCILED": 6
     },
     "rdCostStackCounts": {
-      "not_derivable_from_document": 1,
-      "partial_but_financially_reconciled": 3,
-      "financially_unreconciled": 7
+      "partial_but_financially_reconciled": 11
     },
     "sensitivityCounts": {
-      "UNRESOLVED": 10,
-      "TRANSACTION_COUNT_DRIVEN": 1
+      "MIXED": 7,
+      "UNRESOLVED": 1,
+      "FIXED_COST_DRIVEN": 3
     },
     "incidenceCounts": {
       "INCIDENCE_UNRESOLVED": 11
@@ -52,7 +50,7 @@
         "start": "2024-11-01",
         "end": "2024-11-30"
       },
-      "profileState": "UNAVAILABLE_CURRENT_STATEMENT",
+      "profileState": "PARTIAL_CURRENT_STATEMENT",
       "activity": {
         "processedVolume": {
           "state": "UNKNOWN",
@@ -265,24 +263,262 @@
       ],
       "observedActivityFieldCount": 1,
       "unresolvedActivityFieldCount": 14,
-      "rdCostStackCompleteness": "not_derivable_from_document",
-      "rdContributingChargeCount": 0,
-      "deterministicallyMappedChargeCount": 0,
-      "unresolvedMappedChargeCount": 0,
-      "rdTotalStatementProcessingCostMinor": null,
-      "profileMappedNetMinor": 0,
-      "profileReconciliationDeltaMinor": null,
-      "reconcilesToRdTotal": false,
-      "productCostBuckets": [],
+      "rdCostStackCompleteness": "partial_but_financially_reconciled",
+      "rdContributingChargeCount": 134,
+      "deterministicallyMappedChargeCount": 133,
+      "unresolvedMappedChargeCount": 1,
+      "rdTotalStatementProcessingCostMinor": 133096,
+      "profileMappedNetMinor": 133096,
+      "profileReconciliationDeltaMinor": 0,
+      "rdNonAdditiveRoundingResidual": null,
+      "reconcilesToRdTotal": true,
+      "productCostBuckets": [
+        {
+          "concept": "INTERCHANGE_ISSUER_ECONOMICS",
+          "debitAmountMinor": 55792,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 55792,
+          "rdEconomicChargeRefs": [
+            "economic_charge_002",
+            "economic_charge_003",
+            "economic_charge_004",
+            "economic_charge_005",
+            "economic_charge_007",
+            "economic_charge_008",
+            "economic_charge_009",
+            "economic_charge_010",
+            "economic_charge_011",
+            "economic_charge_012",
+            "economic_charge_014",
+            "economic_charge_015",
+            "economic_charge_016",
+            "economic_charge_017",
+            "economic_charge_018",
+            "economic_charge_019",
+            "economic_charge_020",
+            "economic_charge_021",
+            "economic_charge_022",
+            "economic_charge_024",
+            "economic_charge_025",
+            "economic_charge_026",
+            "economic_charge_027",
+            "economic_charge_035",
+            "economic_charge_036",
+            "economic_charge_037",
+            "economic_charge_038",
+            "economic_charge_039",
+            "economic_charge_045",
+            "economic_charge_048",
+            "economic_charge_049",
+            "economic_charge_050",
+            "economic_charge_051",
+            "economic_charge_054",
+            "economic_charge_056",
+            "economic_charge_059",
+            "economic_charge_060",
+            "economic_charge_062",
+            "economic_charge_083",
+            "economic_charge_085",
+            "economic_charge_086",
+            "economic_charge_088",
+            "economic_charge_089",
+            "economic_charge_090",
+            "economic_charge_091",
+            "economic_charge_092",
+            "economic_charge_093",
+            "economic_charge_094",
+            "economic_charge_096",
+            "economic_charge_098"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "CARD_NETWORK_ECONOMICS",
+          "debitAmountMinor": 13591,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 13591,
+          "rdEconomicChargeRefs": [
+            "economic_charge_006",
+            "economic_charge_013",
+            "economic_charge_028",
+            "economic_charge_033",
+            "economic_charge_034",
+            "economic_charge_043",
+            "economic_charge_044",
+            "economic_charge_047",
+            "economic_charge_070",
+            "economic_charge_076",
+            "economic_charge_078",
+            "economic_charge_080",
+            "economic_charge_084",
+            "economic_charge_087",
+            "economic_charge_104",
+            "economic_charge_106",
+            "economic_charge_128",
+            "economic_charge_131",
+            "economic_charge_134"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "PROVIDER_CONTROLLED_PERCENTAGE_ECONOMICS",
+          "debitAmountMinor": 6118,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 6118,
+          "rdEconomicChargeRefs": [
+            "economic_charge_030",
+            "economic_charge_063",
+            "economic_charge_065",
+            "economic_charge_077",
+            "economic_charge_079",
+            "economic_charge_099",
+            "economic_charge_103",
+            "economic_charge_105"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "PROVIDER_CONTROLLED_PER_ITEM_ECONOMICS",
+          "debitAmountMinor": 18952,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 18952,
+          "rdEconomicChargeRefs": [
+            "economic_charge_032",
+            "economic_charge_068",
+            "economic_charge_081",
+            "economic_charge_082",
+            "economic_charge_101",
+            "economic_charge_108",
+            "economic_charge_109"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "ANCILLARY_SERVICE_ECONOMICS",
+          "debitAmountMinor": 4995,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 4995,
+          "rdEconomicChargeRefs": [
+            "economic_charge_127"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "DISPUTE_CHARGEBACK_ECONOMICS",
+          "debitAmountMinor": 16,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 16,
+          "rdEconomicChargeRefs": [
+            "economic_charge_064"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "UNRESOLVED_SHARED_BUNDLED_ECONOMICS",
+          "debitAmountMinor": 33632,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 33632,
+          "rdEconomicChargeRefs": [
+            "economic_charge_001",
+            "economic_charge_023",
+            "economic_charge_029",
+            "economic_charge_031",
+            "economic_charge_040",
+            "economic_charge_041",
+            "economic_charge_042",
+            "economic_charge_046",
+            "economic_charge_052",
+            "economic_charge_053",
+            "economic_charge_055",
+            "economic_charge_057",
+            "economic_charge_058",
+            "economic_charge_061",
+            "economic_charge_066",
+            "economic_charge_067",
+            "economic_charge_069",
+            "economic_charge_071",
+            "economic_charge_072",
+            "economic_charge_073",
+            "economic_charge_074",
+            "economic_charge_075",
+            "economic_charge_095",
+            "economic_charge_097",
+            "economic_charge_100",
+            "economic_charge_102",
+            "economic_charge_107",
+            "economic_charge_110",
+            "economic_charge_111",
+            "economic_charge_112",
+            "economic_charge_113",
+            "economic_charge_114",
+            "economic_charge_115",
+            "economic_charge_116",
+            "economic_charge_117",
+            "economic_charge_118",
+            "economic_charge_119",
+            "economic_charge_120",
+            "economic_charge_121",
+            "economic_charge_122",
+            "economic_charge_123",
+            "economic_charge_124",
+            "economic_charge_125",
+            "economic_charge_126",
+            "economic_charge_129",
+            "economic_charge_130",
+            "economic_charge_132",
+            "economic_charge_133"
+          ],
+          "rdRemainderIncludedMinor": 0
+        }
+      ],
       "duplicateChargeContributionCount": 0,
       "nonFeePrincipalContributionCount": 0,
       "sensitivity": {
-        "state": "UNRESOLVED",
-        "countDrivenChargeRefs": [],
-        "volumeDrivenChargeRefs": [],
-        "fixedCostDrivenChargeRefs": [],
-        "unresolvedControllableChargeRefs": [],
-        "pricingPopulationRefs": [],
+        "state": "MIXED",
+        "countDrivenChargeRefs": [
+          "economic_charge_032",
+          "economic_charge_068",
+          "economic_charge_081",
+          "economic_charge_082",
+          "economic_charge_101",
+          "economic_charge_108",
+          "economic_charge_109"
+        ],
+        "volumeDrivenChargeRefs": [
+          "economic_charge_030",
+          "economic_charge_063",
+          "economic_charge_065",
+          "economic_charge_077",
+          "economic_charge_079",
+          "economic_charge_099",
+          "economic_charge_103",
+          "economic_charge_105"
+        ],
+        "mixedMinimumChargeRefs": [],
+        "fixedCostDrivenChargeRefs": [
+          "economic_charge_128"
+        ],
+        "unresolvedControllableChargeRefs": [
+          "economic_charge_001"
+        ],
+        "pricingPopulationRefs": [
+          "pricing_population_001",
+          "pricing_population_006",
+          "pricing_population_008",
+          "pricing_population_014",
+          "pricing_population_016",
+          "pricing_population_019",
+          "pricing_population_023",
+          "pricing_population_025",
+          "pricing_population_027",
+          "pricing_population_028",
+          "pricing_population_031",
+          "pricing_population_033",
+          "pricing_population_035",
+          "pricing_population_037",
+          "pricing_population_040",
+          "pricing_population_041"
+        ],
         "averageTicketFactRef": null,
         "averageTicketUsed": false,
         "additiveDriverContributionMinor": 0,
@@ -290,14 +526,19 @@
         "limitations": [
           "Sensitivity describes reproduced mechanics of exact provider-controlled current charges; it is not a market or savings judgment.",
           "Average ticket is preserved as context but is not used to manufacture a mechanic or primary-driver threshold.",
-          "No exact provider-controlled reproduced mechanic supports a sensitivity conclusion."
+          "Some exact provider-controlled charges lack a reproduced count, volume, or fixed-period mechanic.",
+          "Claim-scoped volume admissions extend sensitivity only where exact governed base, rate, arithmetic, control, economic classification, and uniqueness predicates pass.",
+          "Claim-scoped fixed-cost admissions extend sensitivity only where a known fixed RD amount, statement-explicit cadence, uniqueness, activity-independence, and non-overlap predicates pass; control remains a separate claim."
         ]
       },
       "incidence": {
         "state": "INCIDENCE_UNRESOLVED",
         "evidenceAccess": "UNRESOLVED",
         "evidenceRefs": [],
-        "grossProcessingCost": null,
+        "grossProcessingCost": {
+          "amountMinor": 133096,
+          "currency": "USD"
+        },
         "costOffsetRevenue": {
           "state": "UNKNOWN",
           "value": null,
@@ -347,7 +588,7 @@
         }
       ],
       "completeness": {
-        "profileState": "UNAVAILABLE_CURRENT_STATEMENT",
+        "profileState": "PARTIAL_CURRENT_STATEMENT",
         "observedActivityFields": [
           "grossSaleTransactionCount"
         ],
@@ -367,9 +608,9 @@
           "averageTicket",
           "channel"
         ],
-        "costMappingState": "RD_COST_UNAVAILABLE",
+        "costMappingState": "PARTIAL_RD_CHARGE_MAPPING",
         "pricingFormulaCoverage": "partial_observed_components",
-        "feeLedgerReconciliation": "not_derivable_from_document",
+        "feeLedgerReconciliation": "partial_but_financially_reconciled",
         "completeMerchantEconomicsClaimAllowed": false,
         "completeCostOfAcceptanceClaimAllowed": false,
         "limitations": [
@@ -392,8 +633,8 @@
       "canonicalFingerprintBefore": "568968da58d41d4092e86161cbf9997620422b1bf6c375bca5fc89fd7a27c445",
       "canonicalFingerprintAfter": "568968da58d41d4092e86161cbf9997620422b1bf6c375bca5fc89fd7a27c445",
       "canonicalFingerprintInvariant": true,
-      "rdFingerprintBefore": "afa19272c973a1d302be9e1f0ac2a853e66e123c04ee76fec5a05dd70b2abe27",
-      "rdFingerprintAfter": "afa19272c973a1d302be9e1f0ac2a853e66e123c04ee76fec5a05dd70b2abe27",
+      "rdFingerprintBefore": "cba4d7deb8c066a273efbb902c2d9b95668d7651ee30d0641df34afab340878d",
+      "rdFingerprintAfter": "cba4d7deb8c066a273efbb902c2d9b95668d7651ee30d0641df34afab340878d",
       "rdFingerprintInvariant": true
     },
     {
@@ -623,6 +864,7 @@
       "rdTotalStatementProcessingCostMinor": 131255,
       "profileMappedNetMinor": 131255,
       "profileReconciliationDeltaMinor": 0,
+      "rdNonAdditiveRoundingResidual": null,
       "reconcilesToRdTotal": true,
       "productCostBuckets": [
         {
@@ -826,7 +1068,7 @@
       "duplicateChargeContributionCount": 0,
       "nonFeePrincipalContributionCount": 0,
       "sensitivity": {
-        "state": "TRANSACTION_COUNT_DRIVEN",
+        "state": "MIXED",
         "countDrivenChargeRefs": [
           "economic_charge_032",
           "economic_charge_068",
@@ -836,10 +1078,7 @@
           "economic_charge_108",
           "economic_charge_109"
         ],
-        "volumeDrivenChargeRefs": [],
-        "fixedCostDrivenChargeRefs": [],
-        "unresolvedControllableChargeRefs": [
-          "economic_charge_001",
+        "volumeDrivenChargeRefs": [
           "economic_charge_030",
           "economic_charge_063",
           "economic_charge_065",
@@ -849,6 +1088,13 @@
           "economic_charge_103",
           "economic_charge_105"
         ],
+        "mixedMinimumChargeRefs": [
+          "economic_charge_001"
+        ],
+        "fixedCostDrivenChargeRefs": [
+          "economic_charge_128"
+        ],
+        "unresolvedControllableChargeRefs": [],
         "pricingPopulationRefs": [
           "pricing_population_001",
           "pricing_population_006",
@@ -874,7 +1120,10 @@
         "limitations": [
           "Sensitivity describes reproduced mechanics of exact provider-controlled current charges; it is not a market or savings judgment.",
           "Average ticket is preserved as context but is not used to manufacture a mechanic or primary-driver threshold.",
-          "Some exact provider-controlled charges lack a reproduced count, volume, or fixed-period mechanic."
+          "Some exact provider-controlled charges lack a reproduced count, volume, or fixed-period mechanic.",
+          "Claim-scoped volume admissions extend sensitivity only where exact governed base, rate, arithmetic, control, economic classification, and uniqueness predicates pass.",
+          "Claim-scoped mixed/minimum admissions extend sensitivity only where an exact governed minimum-applied-count relationship, operands, arithmetic, control, uniqueness, and non-overlap predicates pass.",
+          "Claim-scoped fixed-cost admissions extend sensitivity only where a known fixed RD amount, statement-explicit cadence, uniqueness, activity-independence, and non-overlap predicates pass; control remains a separate claim."
         ]
       },
       "incidence": {
@@ -1207,6 +1456,7 @@
       "rdTotalStatementProcessingCostMinor": 14131,
       "profileMappedNetMinor": 14131,
       "profileReconciliationDeltaMinor": 0,
+      "rdNonAdditiveRoundingResidual": null,
       "reconcilesToRdTotal": true,
       "productCostBuckets": [
         {
@@ -1236,6 +1486,7 @@
         "state": "UNRESOLVED",
         "countDrivenChargeRefs": [],
         "volumeDrivenChargeRefs": [],
+        "mixedMinimumChargeRefs": [],
         "fixedCostDrivenChargeRefs": [],
         "unresolvedControllableChargeRefs": [],
         "pricingPopulationRefs": [],
@@ -1361,7 +1612,7 @@
         "start": "2025-08-01",
         "end": "2025-08-31"
       },
-      "profileState": "PARTIAL_CURRENT_STATEMENT",
+      "profileState": "OBSERVED_RECONCILED",
       "activity": {
         "processedVolume": {
           "state": "KNOWN",
@@ -1578,32 +1829,216 @@
       "observedActivityFieldCount": 1,
       "unresolvedActivityFieldCount": 14,
       "rdCostStackCompleteness": "partial_but_financially_reconciled",
-      "rdContributingChargeCount": 0,
-      "deterministicallyMappedChargeCount": 0,
+      "rdContributingChargeCount": 50,
+      "deterministicallyMappedChargeCount": 50,
       "unresolvedMappedChargeCount": 0,
       "rdTotalStatementProcessingCostMinor": 9119,
-      "profileMappedNetMinor": 9119,
-      "profileReconciliationDeltaMinor": 0,
+      "profileMappedNetMinor": 9120,
+      "profileReconciliationDeltaMinor": -1,
+      "rdNonAdditiveRoundingResidual": {
+        "policyVersion": "fiserv_fee_total_nonadditive_rounding_residual_max_2_minor_units_v1",
+        "state": "accepted_bounded_rounding_nonadditive",
+        "printedStatementFeeTotalMinor": 9119,
+        "admittedFeeOccurrenceSumMinor": 9120,
+        "signedResidualMinor": -1,
+        "absoluteResidualMinor": 1,
+        "maximumAcceptedAbsoluteResidualMinor": 2,
+        "controlRef": "prebound_control_28_fee_detail_all_line_items_eq_total_fees",
+        "evidenceRefs": [
+          "evidence_v2_054f9a162d44b0446f193be8",
+          "evidence_v2_09ea25491db91b309fb8837b",
+          "evidence_v2_0d8f4b37af12ce3f59d459c4",
+          "evidence_v2_10dde42352e6c003b376d862",
+          "evidence_v2_111ccc99d203a9cac4c29e51",
+          "evidence_v2_2106aafc585567c6b7445b4d",
+          "evidence_v2_25664d0003ff617ca5dc0823",
+          "evidence_v2_2650431499f1cd5b93fdac07",
+          "evidence_v2_2ba9d158b114eafa7420966b",
+          "evidence_v2_30ad5140c03ba12052f39852",
+          "evidence_v2_30cd1965c61654adc7918ee3",
+          "evidence_v2_39a59f721fee0bdc6eabf93f",
+          "evidence_v2_39dda84fd064a7c470b320fb",
+          "evidence_v2_3bdf3fac229b084f10a41ffe",
+          "evidence_v2_41b4d5b75ececc11776fe842",
+          "evidence_v2_4aa845d0f62733dfea731681",
+          "evidence_v2_5028d07c40c3b1b07e4fce0e",
+          "evidence_v2_54928baac1a2766ee6536450",
+          "evidence_v2_602a83e9509a4d6e336a9751",
+          "evidence_v2_6312084b0ea87e8aa6c0325f",
+          "evidence_v2_63e433c0d018b79d0c27d777",
+          "evidence_v2_6591a004752f1621e746587e",
+          "evidence_v2_6b5dd49aa5ad66da039c7252",
+          "evidence_v2_705f05040cdc93d0d6ca45e4",
+          "evidence_v2_7164395f940bc3149bb7010e",
+          "evidence_v2_76df690ee774ec05aa9699d9",
+          "evidence_v2_7db26070f58e5ee873e9b0ae",
+          "evidence_v2_7fccd9642bc9a54f14813274",
+          "evidence_v2_835633c2d9f28b4da52794d4",
+          "evidence_v2_86d4e7865b469cf324f4cc64",
+          "evidence_v2_9b9846ac0842a21e1a911970",
+          "evidence_v2_9bd825dfea4251e1b85d9bb5",
+          "evidence_v2_9fc5d1b130ae45735a4035cc",
+          "evidence_v2_a867ec6678e8bcd09a219191",
+          "evidence_v2_b027e6301aebbad06941910e",
+          "evidence_v2_b9ad45aa589fc85e2e1b2ee5",
+          "evidence_v2_bb456ac03395c8607aec9221",
+          "evidence_v2_bd815dacfd372a197d21540e",
+          "evidence_v2_bdd4a6dd6d2b14ec4d8b2f2e",
+          "evidence_v2_c3e6a6b5732daa5b3682affe",
+          "evidence_v2_c4c9325bd85f9b71ade121a6",
+          "evidence_v2_c65219c179cd978f23582d03",
+          "evidence_v2_ca328d5b787f336ff68fdc22",
+          "evidence_v2_d27da5dca27856069435fc8c",
+          "evidence_v2_df487b2a61367f448dca5f03",
+          "evidence_v2_ea2615de7ec544c6a79c5772",
+          "evidence_v2_ef7ef7815e5312b17dea139c",
+          "evidence_v2_ef8d58b359c69c1e4217d284",
+          "evidence_v2_f262a7c6e3fbb8eed533c723",
+          "evidence_v2_f720262a57d205b1624d77d2",
+          "evidence_v2_fa72e7071b0c247f26706fd3",
+          "evidence_v2_ff427b523ea25d449db7af3d",
+          "evidence_v2_fff614a8f0be9eaccb2b37cc"
+        ],
+        "reasonCode": "bounded_rounding_reconciles_complete_fee_population",
+        "additiveChargeRef": null,
+        "category": null,
+        "participantOrOwner": null
+      },
       "reconcilesToRdTotal": true,
       "productCostBuckets": [
         {
-          "concept": "UNRESOLVED_SHARED_BUNDLED_ECONOMICS",
-          "debitAmountMinor": 9119,
+          "concept": "INTERCHANGE_ISSUER_ECONOMICS",
+          "debitAmountMinor": 3470,
           "creditAmountMinor": 0,
-          "netAmountMinor": 9119,
-          "rdEconomicChargeRefs": [],
-          "rdRemainderIncludedMinor": 9119
+          "netAmountMinor": 3470,
+          "rdEconomicChargeRefs": [
+            "economic_charge_006",
+            "economic_charge_015",
+            "economic_charge_027",
+            "economic_charge_033",
+            "economic_charge_045"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "CARD_NETWORK_ECONOMICS",
+          "debitAmountMinor": 485,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 485,
+          "rdEconomicChargeRefs": [
+            "economic_charge_001",
+            "economic_charge_007",
+            "economic_charge_008",
+            "economic_charge_009",
+            "economic_charge_013",
+            "economic_charge_020",
+            "economic_charge_021",
+            "economic_charge_022",
+            "economic_charge_028",
+            "economic_charge_029",
+            "economic_charge_034"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "PROVIDER_CONTROLLED_PER_ITEM_ECONOMICS",
+          "debitAmountMinor": 701,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 701,
+          "rdEconomicChargeRefs": [
+            "economic_charge_044",
+            "economic_charge_047"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "FIXED_ACCOUNT_SERVICE_ECONOMICS",
+          "debitAmountMinor": 1000,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 1000,
+          "rdEconomicChargeRefs": [
+            "economic_charge_050"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "ANCILLARY_SERVICE_ECONOMICS",
+          "debitAmountMinor": 830,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 830,
+          "rdEconomicChargeRefs": [
+            "economic_charge_004",
+            "economic_charge_019",
+            "economic_charge_030",
+            "economic_charge_036",
+            "economic_charge_046"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "TAX_REGULATORY_PASS_THROUGH",
+          "debitAmountMinor": 395,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 395,
+          "rdEconomicChargeRefs": [
+            "economic_charge_048"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "UNRESOLVED_SHARED_BUNDLED_ECONOMICS",
+          "debitAmountMinor": 2239,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 2239,
+          "rdEconomicChargeRefs": [
+            "economic_charge_002",
+            "economic_charge_003",
+            "economic_charge_005",
+            "economic_charge_010",
+            "economic_charge_011",
+            "economic_charge_012",
+            "economic_charge_014",
+            "economic_charge_016",
+            "economic_charge_017",
+            "economic_charge_018",
+            "economic_charge_023",
+            "economic_charge_024",
+            "economic_charge_025",
+            "economic_charge_026",
+            "economic_charge_031",
+            "economic_charge_032",
+            "economic_charge_035",
+            "economic_charge_037",
+            "economic_charge_038",
+            "economic_charge_039",
+            "economic_charge_040",
+            "economic_charge_041",
+            "economic_charge_042",
+            "economic_charge_043",
+            "economic_charge_049"
+          ],
+          "rdRemainderIncludedMinor": 0
         }
       ],
       "duplicateChargeContributionCount": 0,
       "nonFeePrincipalContributionCount": 0,
       "sensitivity": {
-        "state": "UNRESOLVED",
-        "countDrivenChargeRefs": [],
+        "state": "MIXED",
+        "countDrivenChargeRefs": [
+          "economic_charge_044",
+          "economic_charge_047"
+        ],
         "volumeDrivenChargeRefs": [],
-        "fixedCostDrivenChargeRefs": [],
+        "mixedMinimumChargeRefs": [],
+        "fixedCostDrivenChargeRefs": [
+          "economic_charge_050"
+        ],
         "unresolvedControllableChargeRefs": [],
-        "pricingPopulationRefs": [],
+        "pricingPopulationRefs": [
+          "pricing_population_044",
+          "pricing_population_048",
+          "pricing_population_051"
+        ],
         "averageTicketFactRef": null,
         "averageTicketUsed": false,
         "additiveDriverContributionMinor": 0,
@@ -1611,7 +2046,7 @@
         "limitations": [
           "Sensitivity describes reproduced mechanics of exact provider-controlled current charges; it is not a market or savings judgment.",
           "Average ticket is preserved as context but is not used to manufacture a mechanic or primary-driver threshold.",
-          "No exact provider-controlled reproduced mechanic supports a sensitivity conclusion."
+          "Claim-scoped fixed-cost admissions extend sensitivity only where a known fixed RD amount, statement-explicit cadence, uniqueness, activity-independence, and non-overlap predicates pass; control remains a separate claim."
         ]
       },
       "incidence": {
@@ -1671,7 +2106,7 @@
         }
       ],
       "completeness": {
-        "profileState": "PARTIAL_CURRENT_STATEMENT",
+        "profileState": "OBSERVED_RECONCILED",
         "observedActivityFields": [
           "processedVolume"
         ],
@@ -1691,14 +2126,13 @@
           "averageTicket",
           "channel"
         ],
-        "costMappingState": "PARTIAL_RD_CHARGE_MAPPING",
+        "costMappingState": "ALL_RD_CONTRIBUTING_CHARGES_MAPPED",
         "pricingFormulaCoverage": "partial_observed_components",
         "feeLedgerReconciliation": "partial_but_financially_reconciled",
         "completeMerchantEconomicsClaimAllowed": false,
         "completeCostOfAcceptanceClaimAllowed": false,
         "limitations": [
           "Profile completeness applies only to current-statement economics; it is not pricing-formula completeness or complete cost of acceptance.",
-          "One or more RD charges lack a deterministic governed Product-view mapping.",
           "Unresolved activity fields remain visible and are not converted to zero."
         ]
       },
@@ -1716,8 +2150,8 @@
       "canonicalFingerprintBefore": "183e033028de664a920d042ed84bcd2038db0e32312e951561daac7fb34dee96",
       "canonicalFingerprintAfter": "183e033028de664a920d042ed84bcd2038db0e32312e951561daac7fb34dee96",
       "canonicalFingerprintInvariant": true,
-      "rdFingerprintBefore": "b3dfd4e1237aca42a55d2adc3e0a3da2728de7342a302304e44146c9375453af",
-      "rdFingerprintAfter": "b3dfd4e1237aca42a55d2adc3e0a3da2728de7342a302304e44146c9375453af",
+      "rdFingerprintBefore": "f179da25f63709211b36b58ede37393b6a41167d33db3ee298a1bff5bee79ca7",
+      "rdFingerprintAfter": "f179da25f63709211b36b58ede37393b6a41167d33db3ee298a1bff5bee79ca7",
       "rdFingerprintInvariant": true
     },
     {
@@ -1727,7 +2161,7 @@
         "start": "2020-03-01",
         "end": "2020-03-31"
       },
-      "profileState": "UNAVAILABLE_CURRENT_STATEMENT",
+      "profileState": "OBSERVED_RECONCILED",
       "activity": {
         "processedVolume": {
           "state": "UNKNOWN",
@@ -1941,24 +2375,218 @@
       ],
       "observedActivityFieldCount": 0,
       "unresolvedActivityFieldCount": 15,
-      "rdCostStackCompleteness": "financially_unreconciled",
-      "rdContributingChargeCount": 0,
-      "deterministicallyMappedChargeCount": 0,
+      "rdCostStackCompleteness": "partial_but_financially_reconciled",
+      "rdContributingChargeCount": 105,
+      "deterministicallyMappedChargeCount": 105,
       "unresolvedMappedChargeCount": 0,
-      "rdTotalStatementProcessingCostMinor": null,
-      "profileMappedNetMinor": 0,
-      "profileReconciliationDeltaMinor": null,
-      "reconcilesToRdTotal": false,
-      "productCostBuckets": [],
+      "rdTotalStatementProcessingCostMinor": 355245,
+      "profileMappedNetMinor": 355245,
+      "profileReconciliationDeltaMinor": 0,
+      "rdNonAdditiveRoundingResidual": null,
+      "reconcilesToRdTotal": true,
+      "productCostBuckets": [
+        {
+          "concept": "INTERCHANGE_ISSUER_ECONOMICS",
+          "debitAmountMinor": 116744,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 116744,
+          "rdEconomicChargeRefs": [
+            "economic_charge_001",
+            "economic_charge_002",
+            "economic_charge_003",
+            "economic_charge_005",
+            "economic_charge_006",
+            "economic_charge_007",
+            "economic_charge_008",
+            "economic_charge_009",
+            "economic_charge_010",
+            "economic_charge_011",
+            "economic_charge_013",
+            "economic_charge_014",
+            "economic_charge_016",
+            "economic_charge_017",
+            "economic_charge_019",
+            "economic_charge_021",
+            "economic_charge_022",
+            "economic_charge_023",
+            "economic_charge_024",
+            "economic_charge_032",
+            "economic_charge_034",
+            "economic_charge_036",
+            "economic_charge_044",
+            "economic_charge_046",
+            "economic_charge_048",
+            "economic_charge_049",
+            "economic_charge_051",
+            "economic_charge_052",
+            "economic_charge_053",
+            "economic_charge_054",
+            "economic_charge_055",
+            "economic_charge_056",
+            "economic_charge_057",
+            "economic_charge_058",
+            "economic_charge_059",
+            "economic_charge_060",
+            "economic_charge_062",
+            "economic_charge_063",
+            "economic_charge_064"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "CARD_NETWORK_ECONOMICS",
+          "debitAmountMinor": 24624,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 24624,
+          "rdEconomicChargeRefs": [
+            "economic_charge_020",
+            "economic_charge_029",
+            "economic_charge_037",
+            "economic_charge_039",
+            "economic_charge_069",
+            "economic_charge_077",
+            "economic_charge_082",
+            "economic_charge_090",
+            "economic_charge_100",
+            "economic_charge_102",
+            "economic_charge_104"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "PROVIDER_CONTROLLED_PERCENTAGE_ECONOMICS",
+          "debitAmountMinor": 13945,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 13945,
+          "rdEconomicChargeRefs": [
+            "economic_charge_027",
+            "economic_charge_065",
+            "economic_charge_083",
+            "economic_charge_096",
+            "economic_charge_097"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "PROVIDER_CONTROLLED_PER_ITEM_ECONOMICS",
+          "debitAmountMinor": 23646,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 23646,
+          "rdEconomicChargeRefs": [
+            "economic_charge_028",
+            "economic_charge_030",
+            "economic_charge_066",
+            "economic_charge_070",
+            "economic_charge_084",
+            "economic_charge_085",
+            "economic_charge_086",
+            "economic_charge_098"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "ANCILLARY_SERVICE_ECONOMICS",
+          "debitAmountMinor": 950,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 950,
+          "rdEconomicChargeRefs": [
+            "economic_charge_103"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "UNRESOLVED_SHARED_BUNDLED_ECONOMICS",
+          "debitAmountMinor": 175336,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 175336,
+          "rdEconomicChargeRefs": [
+            "economic_charge_004",
+            "economic_charge_012",
+            "economic_charge_015",
+            "economic_charge_018",
+            "economic_charge_025",
+            "economic_charge_026",
+            "economic_charge_031",
+            "economic_charge_033",
+            "economic_charge_035",
+            "economic_charge_038",
+            "economic_charge_040",
+            "economic_charge_041",
+            "economic_charge_042",
+            "economic_charge_043",
+            "economic_charge_045",
+            "economic_charge_047",
+            "economic_charge_050",
+            "economic_charge_061",
+            "economic_charge_067",
+            "economic_charge_068",
+            "economic_charge_071",
+            "economic_charge_072",
+            "economic_charge_073",
+            "economic_charge_074",
+            "economic_charge_075",
+            "economic_charge_076",
+            "economic_charge_078",
+            "economic_charge_079",
+            "economic_charge_080",
+            "economic_charge_081",
+            "economic_charge_087",
+            "economic_charge_088",
+            "economic_charge_089",
+            "economic_charge_091",
+            "economic_charge_092",
+            "economic_charge_093",
+            "economic_charge_094",
+            "economic_charge_095",
+            "economic_charge_099",
+            "economic_charge_101",
+            "economic_charge_105"
+          ],
+          "rdRemainderIncludedMinor": 0
+        }
+      ],
       "duplicateChargeContributionCount": 0,
       "nonFeePrincipalContributionCount": 0,
       "sensitivity": {
-        "state": "UNRESOLVED",
-        "countDrivenChargeRefs": [],
+        "state": "MIXED",
+        "countDrivenChargeRefs": [
+          "economic_charge_028",
+          "economic_charge_030",
+          "economic_charge_066",
+          "economic_charge_070",
+          "economic_charge_084",
+          "economic_charge_085",
+          "economic_charge_086",
+          "economic_charge_098"
+        ],
         "volumeDrivenChargeRefs": [],
-        "fixedCostDrivenChargeRefs": [],
-        "unresolvedControllableChargeRefs": [],
-        "pricingPopulationRefs": [],
+        "mixedMinimumChargeRefs": [],
+        "fixedCostDrivenChargeRefs": [
+          "economic_charge_102",
+          "economic_charge_105"
+        ],
+        "unresolvedControllableChargeRefs": [
+          "economic_charge_027",
+          "economic_charge_065",
+          "economic_charge_083",
+          "economic_charge_096",
+          "economic_charge_097"
+        ],
+        "pricingPopulationRefs": [
+          "pricing_population_003",
+          "pricing_population_004",
+          "pricing_population_006",
+          "pricing_population_010",
+          "pricing_population_011",
+          "pricing_population_015",
+          "pricing_population_018",
+          "pricing_population_019",
+          "pricing_population_020",
+          "pricing_population_021",
+          "pricing_population_023",
+          "pricing_population_024",
+          "pricing_population_025"
+        ],
         "averageTicketFactRef": null,
         "averageTicketUsed": false,
         "additiveDriverContributionMinor": 0,
@@ -1966,14 +2594,19 @@
         "limitations": [
           "Sensitivity describes reproduced mechanics of exact provider-controlled current charges; it is not a market or savings judgment.",
           "Average ticket is preserved as context but is not used to manufacture a mechanic or primary-driver threshold.",
-          "No exact provider-controlled reproduced mechanic supports a sensitivity conclusion."
+          "Some exact provider-controlled charges lack a reproduced count, volume, or fixed-period mechanic.",
+          "Claim-scoped count admissions extend sensitivity only where exact governed population, count, rate, arithmetic, control, and uniqueness predicates pass.",
+          "Claim-scoped fixed-cost admissions extend sensitivity only where a known fixed RD amount, statement-explicit cadence, uniqueness, activity-independence, and non-overlap predicates pass; control remains a separate claim."
         ]
       },
       "incidence": {
         "state": "INCIDENCE_UNRESOLVED",
         "evidenceAccess": "UNRESOLVED",
         "evidenceRefs": [],
-        "grossProcessingCost": null,
+        "grossProcessingCost": {
+          "amountMinor": 355245,
+          "currency": "USD"
+        },
         "costOffsetRevenue": {
           "state": "UNKNOWN",
           "value": null,
@@ -2023,7 +2656,7 @@
         }
       ],
       "completeness": {
-        "profileState": "UNAVAILABLE_CURRENT_STATEMENT",
+        "profileState": "OBSERVED_RECONCILED",
         "observedActivityFields": [],
         "unresolvedActivityFields": [
           "processedVolume",
@@ -2042,15 +2675,13 @@
           "averageTicket",
           "channel"
         ],
-        "costMappingState": "RD_COST_UNAVAILABLE",
+        "costMappingState": "ALL_RD_CONTRIBUTING_CHARGES_MAPPED",
         "pricingFormulaCoverage": "partial_observed_components",
-        "feeLedgerReconciliation": "financially_unreconciled",
+        "feeLedgerReconciliation": "partial_but_financially_reconciled",
         "completeMerchantEconomicsClaimAllowed": false,
         "completeCostOfAcceptanceClaimAllowed": false,
         "limitations": [
           "Profile completeness applies only to current-statement economics; it is not pricing-formula completeness or complete cost of acceptance.",
-          "One or more RD charges lack a deterministic governed Product-view mapping.",
-          "RD statement processing cost is financially unreconciled and remains unavailable to this profile.",
           "Unresolved activity fields remain visible and are not converted to zero."
         ]
       },
@@ -2068,8 +2699,8 @@
       "canonicalFingerprintBefore": "6bc9ecdaac7833f85d4e9ec533355966b4898285eb14ce90d46de8574581a471",
       "canonicalFingerprintAfter": "6bc9ecdaac7833f85d4e9ec533355966b4898285eb14ce90d46de8574581a471",
       "canonicalFingerprintInvariant": true,
-      "rdFingerprintBefore": "f60b87e70dc0a3424bdb33e278d7da24b87b17d1fbcf686d3dbd4f804f16af70",
-      "rdFingerprintAfter": "f60b87e70dc0a3424bdb33e278d7da24b87b17d1fbcf686d3dbd4f804f16af70",
+      "rdFingerprintBefore": "c81f3a73f3bac5c4bb5e80ff9270b1165eb073ac203574985dbde4cc6e62fa60",
+      "rdFingerprintAfter": "c81f3a73f3bac5c4bb5e80ff9270b1165eb073ac203574985dbde4cc6e62fa60",
       "rdFingerprintInvariant": true
     },
     {
@@ -2079,7 +2710,7 @@
         "start": "2022-09-01",
         "end": "2022-09-30"
       },
-      "profileState": "UNAVAILABLE_CURRENT_STATEMENT",
+      "profileState": "OBSERVED_RECONCILED",
       "activity": {
         "processedVolume": {
           "state": "UNKNOWN",
@@ -2290,24 +2921,252 @@
       ],
       "observedActivityFieldCount": 0,
       "unresolvedActivityFieldCount": 15,
-      "rdCostStackCompleteness": "financially_unreconciled",
-      "rdContributingChargeCount": 0,
-      "deterministicallyMappedChargeCount": 0,
+      "rdCostStackCompleteness": "partial_but_financially_reconciled",
+      "rdContributingChargeCount": 61,
+      "deterministicallyMappedChargeCount": 61,
       "unresolvedMappedChargeCount": 0,
-      "rdTotalStatementProcessingCostMinor": null,
-      "profileMappedNetMinor": 0,
-      "profileReconciliationDeltaMinor": null,
-      "reconcilesToRdTotal": false,
-      "productCostBuckets": [],
+      "rdTotalStatementProcessingCostMinor": 200773,
+      "profileMappedNetMinor": 200771,
+      "profileReconciliationDeltaMinor": 2,
+      "rdNonAdditiveRoundingResidual": {
+        "policyVersion": "fiserv_fee_total_nonadditive_rounding_residual_max_2_minor_units_v1",
+        "state": "accepted_bounded_rounding_nonadditive",
+        "printedStatementFeeTotalMinor": 200773,
+        "admittedFeeOccurrenceSumMinor": 200771,
+        "signedResidualMinor": 2,
+        "absoluteResidualMinor": 2,
+        "maximumAcceptedAbsoluteResidualMinor": 2,
+        "controlRef": "prebound_control_50_fee_detail_all_line_items_eq_total_fees",
+        "evidenceRefs": [
+          "evidence_v2_03f6d6ae4bcbb090c77f0c7d",
+          "evidence_v2_0712b6d9c447eea8e0317aa2",
+          "evidence_v2_0867fc492e5c0ed820f9df49",
+          "evidence_v2_0c179ad14c1e91c3bca6a2b9",
+          "evidence_v2_19d3938ee548a59c40436ac3",
+          "evidence_v2_1c14ef27d9992a0c6a5be457",
+          "evidence_v2_1f407e9f7681c03c2b830287",
+          "evidence_v2_282b9c6ba4961553fe30ecdf",
+          "evidence_v2_2af1f4b3ac9cb5f2ed547fb5",
+          "evidence_v2_3040361b343e49246fc38624",
+          "evidence_v2_30cc7f9875271e23202ec24a",
+          "evidence_v2_3435156d3a8314695c67f136",
+          "evidence_v2_38d20b7a5df000152f60397d",
+          "evidence_v2_3ffbde16434f5a1c520d2998",
+          "evidence_v2_43f251dfdb463bf1073d9f4a",
+          "evidence_v2_52e976e0c803eb8148e20900",
+          "evidence_v2_5464247a6446a1b1b9be4e7f",
+          "evidence_v2_57e2a87ec809e5bf8f5913fc",
+          "evidence_v2_5a5c3ff88dcb2f45f8c41295",
+          "evidence_v2_5c8041162e536951ea579acd",
+          "evidence_v2_5fb7e9f8cebc91f0a9d21fff",
+          "evidence_v2_690694d4afe92f9150f93a6d",
+          "evidence_v2_6d3b1bca117af3b5aec3a74c",
+          "evidence_v2_75a2067f97e67b4d5ba77279",
+          "evidence_v2_7ba6ede8d3bcbb35db0f9d49",
+          "evidence_v2_7be6e64c35cebb8dc006c326",
+          "evidence_v2_82e285717d044e55f21ed99a",
+          "evidence_v2_85fd9f97c35100267ad69884",
+          "evidence_v2_869c355954648b2be43bee1c",
+          "evidence_v2_86a08a6bc8701dedcb362026",
+          "evidence_v2_887cc5def4add1aa85e8d30e",
+          "evidence_v2_8c2c84389c6cc3ba92bb57a6",
+          "evidence_v2_8fb57325c4c405342c31656b",
+          "evidence_v2_937613f5a9ec77dff8a5359e",
+          "evidence_v2_9494280aca17716bdac6dc72",
+          "evidence_v2_988e55e3a4716d123f71fe7f",
+          "evidence_v2_98fbeb02461f65f926f6e2d0",
+          "evidence_v2_9c54fb18f3408ff6db507543",
+          "evidence_v2_9ee3efc1740b7680c1627dfa",
+          "evidence_v2_a0e700fe5ebbe4120ba3c299",
+          "evidence_v2_a328dbe027a31da66e55758c",
+          "evidence_v2_a7d10b1a78607ad97418c06b",
+          "evidence_v2_aced8389ca46db329c6872ed",
+          "evidence_v2_af5363c2b7e83f42c829ef38",
+          "evidence_v2_bcf98ac7bf650bf6cfd06c61",
+          "evidence_v2_be2f44711fb105c8419eb92e",
+          "evidence_v2_c242db2135f89da9c949483e",
+          "evidence_v2_c701a941b392e1d5943a892c",
+          "evidence_v2_c7addbc834800354009ca512",
+          "evidence_v2_c8e0e0f22d89bf8f7576d2e0",
+          "evidence_v2_cb8ff94379f9f0ec472053bb",
+          "evidence_v2_cee4f1702120b86a28f49911",
+          "evidence_v2_d14457a8bbb04aa10e51c806",
+          "evidence_v2_d5271187df8543ac9e2e635b",
+          "evidence_v2_d88d7353e138f0229515d663",
+          "evidence_v2_da995ac89204c5a40c41e1e5",
+          "evidence_v2_daeac9e8846328e1909f3ca1",
+          "evidence_v2_dbabe9ce991fcd99252b1cff",
+          "evidence_v2_dcd66bc8409bf75aae992687",
+          "evidence_v2_dd7e460356602abdc750f275",
+          "evidence_v2_de2c209a6e063cbff15fd722",
+          "evidence_v2_e455dac44e7cd2517a47f78f",
+          "evidence_v2_e603a5433fdab331302ed7e2",
+          "evidence_v2_e9f8aeb28618b74fec4e39c7",
+          "evidence_v2_ec47e2407719ceae92f4b5e5",
+          "evidence_v2_f0c2d8ade4995a19dd191518",
+          "evidence_v2_f3fbdab24ab6c7de806bb1fb",
+          "evidence_v2_f878ea760bd94a7ac5153e26",
+          "evidence_v2_fdcdb6a49057e8bdea74c47a"
+        ],
+        "reasonCode": "bounded_rounding_reconciles_complete_fee_population",
+        "additiveChargeRef": null,
+        "category": null,
+        "participantOrOwner": null
+      },
+      "reconcilesToRdTotal": true,
+      "productCostBuckets": [
+        {
+          "concept": "INTERCHANGE_ISSUER_ECONOMICS",
+          "debitAmountMinor": 77687,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 77687,
+          "rdEconomicChargeRefs": [
+            "economic_charge_005",
+            "economic_charge_016",
+            "economic_charge_027",
+            "economic_charge_041",
+            "economic_charge_050"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "CARD_NETWORK_ECONOMICS",
+          "debitAmountMinor": 8021,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 8021,
+          "rdEconomicChargeRefs": [
+            "economic_charge_002",
+            "economic_charge_006",
+            "economic_charge_010",
+            "economic_charge_011",
+            "economic_charge_012",
+            "economic_charge_013",
+            "economic_charge_015",
+            "economic_charge_021",
+            "economic_charge_022",
+            "economic_charge_023",
+            "economic_charge_028",
+            "economic_charge_029",
+            "economic_charge_030",
+            "economic_charge_032",
+            "economic_charge_037",
+            "economic_charge_042",
+            "economic_charge_043",
+            "economic_charge_051",
+            "economic_charge_053"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "PROVIDER_CONTROLLED_PER_ITEM_ECONOMICS",
+          "debitAmountMinor": 780,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 780,
+          "rdEconomicChargeRefs": [
+            "economic_charge_055"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "FIXED_ACCOUNT_SERVICE_ECONOMICS",
+          "debitAmountMinor": 2500,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 2500,
+          "rdEconomicChargeRefs": [
+            "economic_charge_058"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "ANCILLARY_SERVICE_ECONOMICS",
+          "debitAmountMinor": 7724,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 7724,
+          "rdEconomicChargeRefs": [
+            "economic_charge_003",
+            "economic_charge_019",
+            "economic_charge_025",
+            "economic_charge_039",
+            "economic_charge_048",
+            "economic_charge_060"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "DISPUTE_CHARGEBACK_ECONOMICS",
+          "debitAmountMinor": 28570,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 28570,
+          "rdEconomicChargeRefs": [
+            "economic_charge_008",
+            "economic_charge_009",
+            "economic_charge_035",
+            "economic_charge_056",
+            "economic_charge_057"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "UNRESOLVED_SHARED_BUNDLED_ECONOMICS",
+          "debitAmountMinor": 75489,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 75489,
+          "rdEconomicChargeRefs": [
+            "economic_charge_001",
+            "economic_charge_004",
+            "economic_charge_007",
+            "economic_charge_014",
+            "economic_charge_017",
+            "economic_charge_018",
+            "economic_charge_020",
+            "economic_charge_024",
+            "economic_charge_026",
+            "economic_charge_031",
+            "economic_charge_033",
+            "economic_charge_034",
+            "economic_charge_036",
+            "economic_charge_038",
+            "economic_charge_040",
+            "economic_charge_044",
+            "economic_charge_045",
+            "economic_charge_046",
+            "economic_charge_047",
+            "economic_charge_049",
+            "economic_charge_052",
+            "economic_charge_054",
+            "economic_charge_059",
+            "economic_charge_061"
+          ],
+          "rdRemainderIncludedMinor": 0
+        }
+      ],
       "duplicateChargeContributionCount": 0,
       "nonFeePrincipalContributionCount": 0,
       "sensitivity": {
-        "state": "UNRESOLVED",
-        "countDrivenChargeRefs": [],
+        "state": "MIXED",
+        "countDrivenChargeRefs": [
+          "economic_charge_055",
+          "economic_charge_003",
+          "economic_charge_019",
+          "economic_charge_025",
+          "economic_charge_039",
+          "economic_charge_048"
+        ],
         "volumeDrivenChargeRefs": [],
-        "fixedCostDrivenChargeRefs": [],
+        "mixedMinimumChargeRefs": [],
+        "fixedCostDrivenChargeRefs": [
+          "economic_charge_058",
+          "economic_charge_060"
+        ],
         "unresolvedControllableChargeRefs": [],
-        "pricingPopulationRefs": [],
+        "pricingPopulationRefs": [
+          "pricing_population_040",
+          "pricing_population_002",
+          "pricing_population_012",
+          "pricing_population_017",
+          "pricing_population_028",
+          "pricing_population_034"
+        ],
         "averageTicketFactRef": null,
         "averageTicketUsed": false,
         "additiveDriverContributionMinor": 0,
@@ -2315,14 +3174,18 @@
         "limitations": [
           "Sensitivity describes reproduced mechanics of exact provider-controlled current charges; it is not a market or savings judgment.",
           "Average ticket is preserved as context but is not used to manufacture a mechanic or primary-driver threshold.",
-          "No exact provider-controlled reproduced mechanic supports a sensitivity conclusion."
+          "Claim-scoped count admissions extend sensitivity only where exact governed population, count, rate, arithmetic, control, and uniqueness predicates pass.",
+          "Claim-scoped fixed-cost admissions extend sensitivity only where a known fixed RD amount, statement-explicit cadence, uniqueness, activity-independence, and non-overlap predicates pass; control remains a separate claim."
         ]
       },
       "incidence": {
         "state": "INCIDENCE_UNRESOLVED",
         "evidenceAccess": "UNRESOLVED",
         "evidenceRefs": [],
-        "grossProcessingCost": null,
+        "grossProcessingCost": {
+          "amountMinor": 200773,
+          "currency": "USD"
+        },
         "costOffsetRevenue": {
           "state": "UNKNOWN",
           "value": null,
@@ -2372,7 +3235,7 @@
         }
       ],
       "completeness": {
-        "profileState": "UNAVAILABLE_CURRENT_STATEMENT",
+        "profileState": "OBSERVED_RECONCILED",
         "observedActivityFields": [],
         "unresolvedActivityFields": [
           "processedVolume",
@@ -2391,15 +3254,13 @@
           "averageTicket",
           "channel"
         ],
-        "costMappingState": "RD_COST_UNAVAILABLE",
+        "costMappingState": "ALL_RD_CONTRIBUTING_CHARGES_MAPPED",
         "pricingFormulaCoverage": "partial_observed_components",
-        "feeLedgerReconciliation": "financially_unreconciled",
+        "feeLedgerReconciliation": "partial_but_financially_reconciled",
         "completeMerchantEconomicsClaimAllowed": false,
         "completeCostOfAcceptanceClaimAllowed": false,
         "limitations": [
           "Profile completeness applies only to current-statement economics; it is not pricing-formula completeness or complete cost of acceptance.",
-          "One or more RD charges lack a deterministic governed Product-view mapping.",
-          "RD statement processing cost is financially unreconciled and remains unavailable to this profile.",
           "Unresolved activity fields remain visible and are not converted to zero."
         ]
       },
@@ -2417,8 +3278,8 @@
       "canonicalFingerprintBefore": "fc0ea14383eecfafa3a7e9a6b3fc702208fafc79f8525906f24b341d89e22ba9",
       "canonicalFingerprintAfter": "fc0ea14383eecfafa3a7e9a6b3fc702208fafc79f8525906f24b341d89e22ba9",
       "canonicalFingerprintInvariant": true,
-      "rdFingerprintBefore": "945bc0b7684c1c4f06083f70f8b8d3e602abbfc309bdf91be5f5c969b3f40566",
-      "rdFingerprintAfter": "945bc0b7684c1c4f06083f70f8b8d3e602abbfc309bdf91be5f5c969b3f40566",
+      "rdFingerprintBefore": "e917a1998fa7b9fcf47d0b1ab8e533ff4fc9077044bd4a5249f26e829330b4b7",
+      "rdFingerprintAfter": "e917a1998fa7b9fcf47d0b1ab8e533ff4fc9077044bd4a5249f26e829330b4b7",
       "rdFingerprintInvariant": true
     },
     {
@@ -2428,7 +3289,7 @@
         "start": "2024-02-01",
         "end": "2024-02-29"
       },
-      "profileState": "UNAVAILABLE_CURRENT_STATEMENT",
+      "profileState": "OBSERVED_RECONCILED",
       "activity": {
         "processedVolume": {
           "state": "UNKNOWN",
@@ -2642,24 +3503,147 @@
       ],
       "observedActivityFieldCount": 0,
       "unresolvedActivityFieldCount": 15,
-      "rdCostStackCompleteness": "financially_unreconciled",
-      "rdContributingChargeCount": 0,
-      "deterministicallyMappedChargeCount": 0,
+      "rdCostStackCompleteness": "partial_but_financially_reconciled",
+      "rdContributingChargeCount": 22,
+      "deterministicallyMappedChargeCount": 22,
       "unresolvedMappedChargeCount": 0,
-      "rdTotalStatementProcessingCostMinor": null,
-      "profileMappedNetMinor": 0,
-      "profileReconciliationDeltaMinor": null,
-      "reconcilesToRdTotal": false,
-      "productCostBuckets": [],
+      "rdTotalStatementProcessingCostMinor": 156573,
+      "profileMappedNetMinor": 156571,
+      "profileReconciliationDeltaMinor": 2,
+      "rdNonAdditiveRoundingResidual": {
+        "policyVersion": "fiserv_fee_total_nonadditive_rounding_residual_max_2_minor_units_v1",
+        "state": "accepted_bounded_rounding_nonadditive",
+        "printedStatementFeeTotalMinor": 156573,
+        "admittedFeeOccurrenceSumMinor": 156571,
+        "signedResidualMinor": 2,
+        "absoluteResidualMinor": 2,
+        "maximumAcceptedAbsoluteResidualMinor": 2,
+        "controlRef": "prebound_control_25_fee_detail_all_line_items_eq_total_fees",
+        "evidenceRefs": [
+          "evidence_v2_0193a5b9a47f204ce28350a9",
+          "evidence_v2_05724274082f34ece73270f4",
+          "evidence_v2_06c5a1bdee94a7bc32f85b34",
+          "evidence_v2_16390c7cf74a17d4e1a45544",
+          "evidence_v2_233e6f63a5a67d2871aa576b",
+          "evidence_v2_286712bb71d713e0b2060701",
+          "evidence_v2_2e61eb1837aae66a3433ebcd",
+          "evidence_v2_35e222507319b06f7f388f6b",
+          "evidence_v2_3e97003e3f23126c5d7fca9a",
+          "evidence_v2_489372295f9a27949926ce98",
+          "evidence_v2_540fba2c93bf348742e5a55b",
+          "evidence_v2_54427a286ef7acaf31d06bed",
+          "evidence_v2_6e7b4e907ce5e01b3ee16e50",
+          "evidence_v2_6f759a23ae4b076dcaf5fd1a",
+          "evidence_v2_79b56ea50d5f0519ecc67f9f",
+          "evidence_v2_85e14d2dca96067118808d5e",
+          "evidence_v2_8695fa72b7d487b616a5bc76",
+          "evidence_v2_88497fb6e1ce5e1e8d78fc0b",
+          "evidence_v2_8c83805b1d7007b5bc7c4314",
+          "evidence_v2_8ffdbaa8d3195dbb1c5cf574",
+          "evidence_v2_918d018b167a459323b55fb2",
+          "evidence_v2_94e160b61e7352ab8de5271a",
+          "evidence_v2_9f48ce0500c4e8d43f80057a",
+          "evidence_v2_a1a461a6ecd97c1b0775111c",
+          "evidence_v2_a245622320d1b80aa29206a3",
+          "evidence_v2_a778b7e9a13f32ef84221dec",
+          "evidence_v2_ba4a364341b14840e056387e",
+          "evidence_v2_e69607531c96381532b11664",
+          "evidence_v2_ecaf5c44ebf79cfd2c738c74",
+          "evidence_v2_ed731621f33f2cfc598f57a3"
+        ],
+        "reasonCode": "bounded_rounding_reconciles_complete_fee_population",
+        "additiveChargeRef": null,
+        "category": null,
+        "participantOrOwner": null
+      },
+      "reconcilesToRdTotal": true,
+      "productCostBuckets": [
+        {
+          "concept": "CARD_NETWORK_ECONOMICS",
+          "debitAmountMinor": 2596,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 2596,
+          "rdEconomicChargeRefs": [
+            "economic_charge_006",
+            "economic_charge_007",
+            "economic_charge_008",
+            "economic_charge_009",
+            "economic_charge_014"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "PROVIDER_CONTROLLED_PER_ITEM_ECONOMICS",
+          "debitAmountMinor": 673,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 673,
+          "rdEconomicChargeRefs": [
+            "economic_charge_004",
+            "economic_charge_020"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "FIXED_ACCOUNT_SERVICE_ECONOMICS",
+          "debitAmountMinor": 757,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 757,
+          "rdEconomicChargeRefs": [
+            "economic_charge_021"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "ANCILLARY_SERVICE_ECONOMICS",
+          "debitAmountMinor": 2220,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 2220,
+          "rdEconomicChargeRefs": [
+            "economic_charge_003",
+            "economic_charge_011",
+            "economic_charge_017"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "UNRESOLVED_SHARED_BUNDLED_ECONOMICS",
+          "debitAmountMinor": 150325,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 150325,
+          "rdEconomicChargeRefs": [
+            "economic_charge_001",
+            "economic_charge_002",
+            "economic_charge_005",
+            "economic_charge_010",
+            "economic_charge_012",
+            "economic_charge_013",
+            "economic_charge_015",
+            "economic_charge_016",
+            "economic_charge_018",
+            "economic_charge_019",
+            "economic_charge_022"
+          ],
+          "rdRemainderIncludedMinor": 0
+        }
+      ],
       "duplicateChargeContributionCount": 0,
       "nonFeePrincipalContributionCount": 0,
       "sensitivity": {
-        "state": "UNRESOLVED",
+        "state": "FIXED_COST_DRIVEN",
         "countDrivenChargeRefs": [],
         "volumeDrivenChargeRefs": [],
-        "fixedCostDrivenChargeRefs": [],
-        "unresolvedControllableChargeRefs": [],
-        "pricingPopulationRefs": [],
+        "mixedMinimumChargeRefs": [],
+        "fixedCostDrivenChargeRefs": [
+          "economic_charge_021"
+        ],
+        "unresolvedControllableChargeRefs": [
+          "economic_charge_004",
+          "economic_charge_020"
+        ],
+        "pricingPopulationRefs": [
+          "pricing_population_004",
+          "pricing_population_020"
+        ],
         "averageTicketFactRef": null,
         "averageTicketUsed": false,
         "additiveDriverContributionMinor": 0,
@@ -2667,14 +3651,18 @@
         "limitations": [
           "Sensitivity describes reproduced mechanics of exact provider-controlled current charges; it is not a market or savings judgment.",
           "Average ticket is preserved as context but is not used to manufacture a mechanic or primary-driver threshold.",
-          "No exact provider-controlled reproduced mechanic supports a sensitivity conclusion."
+          "Some exact provider-controlled charges lack a reproduced count, volume, or fixed-period mechanic.",
+          "Claim-scoped fixed-cost admissions extend sensitivity only where a known fixed RD amount, statement-explicit cadence, uniqueness, activity-independence, and non-overlap predicates pass; control remains a separate claim."
         ]
       },
       "incidence": {
         "state": "INCIDENCE_UNRESOLVED",
         "evidenceAccess": "UNRESOLVED",
         "evidenceRefs": [],
-        "grossProcessingCost": null,
+        "grossProcessingCost": {
+          "amountMinor": 156573,
+          "currency": "USD"
+        },
         "costOffsetRevenue": {
           "state": "UNKNOWN",
           "value": null,
@@ -2724,7 +3712,7 @@
         }
       ],
       "completeness": {
-        "profileState": "UNAVAILABLE_CURRENT_STATEMENT",
+        "profileState": "OBSERVED_RECONCILED",
         "observedActivityFields": [],
         "unresolvedActivityFields": [
           "processedVolume",
@@ -2743,15 +3731,13 @@
           "averageTicket",
           "channel"
         ],
-        "costMappingState": "RD_COST_UNAVAILABLE",
+        "costMappingState": "ALL_RD_CONTRIBUTING_CHARGES_MAPPED",
         "pricingFormulaCoverage": "partial_observed_components",
-        "feeLedgerReconciliation": "financially_unreconciled",
+        "feeLedgerReconciliation": "partial_but_financially_reconciled",
         "completeMerchantEconomicsClaimAllowed": false,
         "completeCostOfAcceptanceClaimAllowed": false,
         "limitations": [
           "Profile completeness applies only to current-statement economics; it is not pricing-formula completeness or complete cost of acceptance.",
-          "One or more RD charges lack a deterministic governed Product-view mapping.",
-          "RD statement processing cost is financially unreconciled and remains unavailable to this profile.",
           "Unresolved activity fields remain visible and are not converted to zero."
         ]
       },
@@ -2769,8 +3755,8 @@
       "canonicalFingerprintBefore": "2017b752dba2a06a1c352071abdf5df3541f172015b9a54d81afec33a61d3a6e",
       "canonicalFingerprintAfter": "2017b752dba2a06a1c352071abdf5df3541f172015b9a54d81afec33a61d3a6e",
       "canonicalFingerprintInvariant": true,
-      "rdFingerprintBefore": "af19baf0a6562e538c3c2324d0137d425ea957e2295059b71c64b92fb0cf1f5f",
-      "rdFingerprintAfter": "af19baf0a6562e538c3c2324d0137d425ea957e2295059b71c64b92fb0cf1f5f",
+      "rdFingerprintBefore": "aa5ca7a74c607c163fd49b9045d80f0e8b2567e81865a36d6cdc5701eb50cb90",
+      "rdFingerprintAfter": "aa5ca7a74c607c163fd49b9045d80f0e8b2567e81865a36d6cdc5701eb50cb90",
       "rdFingerprintInvariant": true
     },
     {
@@ -2780,7 +3766,7 @@
         "start": "2025-10-01",
         "end": "2025-10-31"
       },
-      "profileState": "UNAVAILABLE_CURRENT_STATEMENT",
+      "profileState": "PARTIAL_CURRENT_STATEMENT",
       "activity": {
         "processedVolume": {
           "state": "UNKNOWN",
@@ -2994,24 +3980,199 @@
       ],
       "observedActivityFieldCount": 0,
       "unresolvedActivityFieldCount": 15,
-      "rdCostStackCompleteness": "financially_unreconciled",
-      "rdContributingChargeCount": 0,
-      "deterministicallyMappedChargeCount": 0,
-      "unresolvedMappedChargeCount": 0,
-      "rdTotalStatementProcessingCostMinor": null,
-      "profileMappedNetMinor": 0,
-      "profileReconciliationDeltaMinor": null,
-      "reconcilesToRdTotal": false,
-      "productCostBuckets": [],
+      "rdCostStackCompleteness": "partial_but_financially_reconciled",
+      "rdContributingChargeCount": 42,
+      "deterministicallyMappedChargeCount": 40,
+      "unresolvedMappedChargeCount": 2,
+      "rdTotalStatementProcessingCostMinor": 37855,
+      "profileMappedNetMinor": 37854,
+      "profileReconciliationDeltaMinor": 1,
+      "rdNonAdditiveRoundingResidual": {
+        "policyVersion": "fiserv_fee_total_nonadditive_rounding_residual_max_2_minor_units_v1",
+        "state": "accepted_bounded_rounding_nonadditive",
+        "printedStatementFeeTotalMinor": 37855,
+        "admittedFeeOccurrenceSumMinor": 37854,
+        "signedResidualMinor": 1,
+        "absoluteResidualMinor": 1,
+        "maximumAcceptedAbsoluteResidualMinor": 2,
+        "controlRef": "prebound_control_17_fee_detail_all_line_items_eq_total_fees",
+        "evidenceRefs": [
+          "evidence_v2_04bfa0c5c1db0b3e88d1a389",
+          "evidence_v2_0dc1afd4d75618a7b98dc2e3",
+          "evidence_v2_0f16ab6d4663b18a1128bcca",
+          "evidence_v2_0f16ed74401051f859163ea8",
+          "evidence_v2_1b79afcb46c9abee97856bf4",
+          "evidence_v2_1d043f2fbffd9133c17229d7",
+          "evidence_v2_310882bc2ebb4eb54939b417",
+          "evidence_v2_31cb4ee31cf0e7e8c7eb5c59",
+          "evidence_v2_36521262c3b903a5047a8d8c",
+          "evidence_v2_37b75ad715bf0e6ea0675e44",
+          "evidence_v2_3b8f5880c69cd4c2304aee0e",
+          "evidence_v2_3c23d87c4519c754d3809ad2",
+          "evidence_v2_3f93aaa526c91cd10868dc0b",
+          "evidence_v2_4057e37d31040093f9e0bef4",
+          "evidence_v2_482c390ca7569445b304affc",
+          "evidence_v2_4832a2cb2da147d622f5be1e",
+          "evidence_v2_4f082f9722f849d9d4940ef2",
+          "evidence_v2_503104c417e0b1c81237d91a",
+          "evidence_v2_5b4dd605f6e38cee2e08b514",
+          "evidence_v2_5b64047d33ed9237a2e0c726",
+          "evidence_v2_5c2379dbcdabda9b85ee5c47",
+          "evidence_v2_5d345490cc2eade2f71d9a77",
+          "evidence_v2_61520640739b603edbd9514f",
+          "evidence_v2_6bf9c7bbe4c40a23226c9ff7",
+          "evidence_v2_74cc819cbc04492238920d57",
+          "evidence_v2_752f3ec3954f319c2c62929e",
+          "evidence_v2_77547163f1af59d3cf284f92",
+          "evidence_v2_791240ec073078a9da4f34ce",
+          "evidence_v2_7b17f8c3869e1911f7d5406a",
+          "evidence_v2_7ce27006942d7d1b53313202",
+          "evidence_v2_7d35ba3e22cd727457ebb921",
+          "evidence_v2_7d666450a375ba2c744e79ba",
+          "evidence_v2_83213f52d1255b514f0ff3b2",
+          "evidence_v2_86db66b03671d6cb9ac806ea",
+          "evidence_v2_8c720e9bf026e110a018b404",
+          "evidence_v2_8f47ab27cc79025e58ae7db9",
+          "evidence_v2_9102867dc79023bce4f29ea4",
+          "evidence_v2_98b77579c23ca2818ec94f9c",
+          "evidence_v2_a207ee5baad2cb356cb8bd60",
+          "evidence_v2_b36847b19cb8f3ca4718b433",
+          "evidence_v2_b66c7d162fb3b86cd9d062db",
+          "evidence_v2_be9f0282d357f17d7df80dd8",
+          "evidence_v2_bea5c983cbda189d6d9561fe",
+          "evidence_v2_c57ac5a9563a6264883c8565",
+          "evidence_v2_c5bfce4a04c24c6bb3bf789d",
+          "evidence_v2_cebc87ec39b9d394dce318b6",
+          "evidence_v2_d93b1a6e78085a5dbc5cb780",
+          "evidence_v2_e2f68c02e1c8fe17c75b95da",
+          "evidence_v2_e57ccd21928f6cc62da1f0ef",
+          "evidence_v2_ee6438119b17ce6b6df22dcb",
+          "evidence_v2_f0de2bbc91ac89c477ea16c6",
+          "evidence_v2_fb0b2d961e0d95cc9afb77a1"
+        ],
+        "reasonCode": "bounded_rounding_reconciles_complete_fee_population",
+        "additiveChargeRef": null,
+        "category": null,
+        "participantOrOwner": null
+      },
+      "reconcilesToRdTotal": true,
+      "productCostBuckets": [
+        {
+          "concept": "CARD_NETWORK_ECONOMICS",
+          "debitAmountMinor": 1539,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 1539,
+          "rdEconomicChargeRefs": [
+            "economic_charge_001",
+            "economic_charge_004",
+            "economic_charge_005",
+            "economic_charge_008",
+            "economic_charge_009",
+            "economic_charge_015",
+            "economic_charge_016",
+            "economic_charge_019",
+            "economic_charge_025",
+            "economic_charge_031",
+            "economic_charge_035"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "PROVIDER_CONTROLLED_PER_ITEM_ECONOMICS",
+          "debitAmountMinor": 470,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 470,
+          "rdEconomicChargeRefs": [
+            "economic_charge_006",
+            "economic_charge_014",
+            "economic_charge_021",
+            "economic_charge_026",
+            "economic_charge_034",
+            "economic_charge_040"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "FIXED_ACCOUNT_SERVICE_ECONOMICS",
+          "debitAmountMinor": 495,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 495,
+          "rdEconomicChargeRefs": [
+            "economic_charge_042"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "ANCILLARY_SERVICE_ECONOMICS",
+          "debitAmountMinor": 1180,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 1180,
+          "rdEconomicChargeRefs": [
+            "economic_charge_007",
+            "economic_charge_017",
+            "economic_charge_020",
+            "economic_charge_024",
+            "economic_charge_030",
+            "economic_charge_039"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "UNRESOLVED_SHARED_BUNDLED_ECONOMICS",
+          "debitAmountMinor": 34170,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 34170,
+          "rdEconomicChargeRefs": [
+            "economic_charge_002",
+            "economic_charge_003",
+            "economic_charge_010",
+            "economic_charge_011",
+            "economic_charge_012",
+            "economic_charge_013",
+            "economic_charge_018",
+            "economic_charge_022",
+            "economic_charge_023",
+            "economic_charge_027",
+            "economic_charge_028",
+            "economic_charge_029",
+            "economic_charge_032",
+            "economic_charge_033",
+            "economic_charge_036",
+            "economic_charge_037",
+            "economic_charge_038",
+            "economic_charge_041"
+          ],
+          "rdRemainderIncludedMinor": 0
+        }
+      ],
       "duplicateChargeContributionCount": 0,
       "nonFeePrincipalContributionCount": 0,
       "sensitivity": {
-        "state": "UNRESOLVED",
-        "countDrivenChargeRefs": [],
+        "state": "MIXED",
+        "countDrivenChargeRefs": [
+          "economic_charge_040"
+        ],
         "volumeDrivenChargeRefs": [],
-        "fixedCostDrivenChargeRefs": [],
-        "unresolvedControllableChargeRefs": [],
-        "pricingPopulationRefs": [],
+        "mixedMinimumChargeRefs": [],
+        "fixedCostDrivenChargeRefs": [
+          "economic_charge_042"
+        ],
+        "unresolvedControllableChargeRefs": [
+          "economic_charge_006",
+          "economic_charge_014",
+          "economic_charge_021",
+          "economic_charge_026",
+          "economic_charge_034"
+        ],
+        "pricingPopulationRefs": [
+          "pricing_population_007",
+          "pricing_population_016",
+          "pricing_population_024",
+          "pricing_population_030",
+          "pricing_population_040",
+          "pricing_population_048",
+          "pricing_population_050"
+        ],
         "averageTicketFactRef": null,
         "averageTicketUsed": false,
         "additiveDriverContributionMinor": 0,
@@ -3019,14 +4180,18 @@
         "limitations": [
           "Sensitivity describes reproduced mechanics of exact provider-controlled current charges; it is not a market or savings judgment.",
           "Average ticket is preserved as context but is not used to manufacture a mechanic or primary-driver threshold.",
-          "No exact provider-controlled reproduced mechanic supports a sensitivity conclusion."
+          "Some exact provider-controlled charges lack a reproduced count, volume, or fixed-period mechanic.",
+          "Claim-scoped fixed-cost admissions extend sensitivity only where a known fixed RD amount, statement-explicit cadence, uniqueness, activity-independence, and non-overlap predicates pass; control remains a separate claim."
         ]
       },
       "incidence": {
         "state": "INCIDENCE_UNRESOLVED",
         "evidenceAccess": "UNRESOLVED",
         "evidenceRefs": [],
-        "grossProcessingCost": null,
+        "grossProcessingCost": {
+          "amountMinor": 37855,
+          "currency": "USD"
+        },
         "costOffsetRevenue": {
           "state": "UNKNOWN",
           "value": null,
@@ -3076,7 +4241,7 @@
         }
       ],
       "completeness": {
-        "profileState": "UNAVAILABLE_CURRENT_STATEMENT",
+        "profileState": "PARTIAL_CURRENT_STATEMENT",
         "observedActivityFields": [],
         "unresolvedActivityFields": [
           "processedVolume",
@@ -3095,15 +4260,14 @@
           "averageTicket",
           "channel"
         ],
-        "costMappingState": "RD_COST_UNAVAILABLE",
+        "costMappingState": "PARTIAL_RD_CHARGE_MAPPING",
         "pricingFormulaCoverage": "partial_observed_components",
-        "feeLedgerReconciliation": "financially_unreconciled",
+        "feeLedgerReconciliation": "partial_but_financially_reconciled",
         "completeMerchantEconomicsClaimAllowed": false,
         "completeCostOfAcceptanceClaimAllowed": false,
         "limitations": [
           "Profile completeness applies only to current-statement economics; it is not pricing-formula completeness or complete cost of acceptance.",
           "One or more RD charges lack a deterministic governed Product-view mapping.",
-          "RD statement processing cost is financially unreconciled and remains unavailable to this profile.",
           "Unresolved activity fields remain visible and are not converted to zero."
         ]
       },
@@ -3121,8 +4285,8 @@
       "canonicalFingerprintBefore": "fd5fee9b7e616581bf393d5b2d12ea5b010e31e8f169f5adbed5a26ebf0b9c4b",
       "canonicalFingerprintAfter": "fd5fee9b7e616581bf393d5b2d12ea5b010e31e8f169f5adbed5a26ebf0b9c4b",
       "canonicalFingerprintInvariant": true,
-      "rdFingerprintBefore": "a0553581d3068078168195273fec0b319255665adcb84ae8fc1d63033a45865f",
-      "rdFingerprintAfter": "a0553581d3068078168195273fec0b319255665adcb84ae8fc1d63033a45865f",
+      "rdFingerprintBefore": "8e27ad57e3b7e383b7d368ca9a81e64130473aa8e05630a500ff076d259b05bf",
+      "rdFingerprintAfter": "8e27ad57e3b7e383b7d368ca9a81e64130473aa8e05630a500ff076d259b05bf",
       "rdFingerprintInvariant": true
     },
     {
@@ -3132,7 +4296,7 @@
         "start": "2025-09-01",
         "end": "2025-09-30"
       },
-      "profileState": "UNAVAILABLE_CURRENT_STATEMENT",
+      "profileState": "PARTIAL_CURRENT_STATEMENT",
       "activity": {
         "processedVolume": {
           "state": "UNKNOWN",
@@ -3346,24 +4510,75 @@
       ],
       "observedActivityFieldCount": 0,
       "unresolvedActivityFieldCount": 15,
-      "rdCostStackCompleteness": "financially_unreconciled",
-      "rdContributingChargeCount": 0,
-      "deterministicallyMappedChargeCount": 0,
-      "unresolvedMappedChargeCount": 0,
-      "rdTotalStatementProcessingCostMinor": null,
-      "profileMappedNetMinor": 0,
-      "profileReconciliationDeltaMinor": null,
-      "reconcilesToRdTotal": false,
-      "productCostBuckets": [],
+      "rdCostStackCompleteness": "partial_but_financially_reconciled",
+      "rdContributingChargeCount": 5,
+      "deterministicallyMappedChargeCount": 4,
+      "unresolvedMappedChargeCount": 1,
+      "rdTotalStatementProcessingCostMinor": 4490,
+      "profileMappedNetMinor": 4490,
+      "profileReconciliationDeltaMinor": 0,
+      "rdNonAdditiveRoundingResidual": null,
+      "reconcilesToRdTotal": true,
+      "productCostBuckets": [
+        {
+          "concept": "CARD_NETWORK_ECONOMICS",
+          "debitAmountMinor": 300,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 300,
+          "rdEconomicChargeRefs": [
+            "economic_charge_001"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "FIXED_ACCOUNT_SERVICE_ECONOMICS",
+          "debitAmountMinor": 495,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 495,
+          "rdEconomicChargeRefs": [
+            "economic_charge_002"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "ANCILLARY_SERVICE_ECONOMICS",
+          "debitAmountMinor": 200,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 200,
+          "rdEconomicChargeRefs": [
+            "economic_charge_004"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "UNRESOLVED_SHARED_BUNDLED_ECONOMICS",
+          "debitAmountMinor": 3495,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 3495,
+          "rdEconomicChargeRefs": [
+            "economic_charge_003",
+            "economic_charge_005"
+          ],
+          "rdRemainderIncludedMinor": 0
+        }
+      ],
       "duplicateChargeContributionCount": 0,
       "nonFeePrincipalContributionCount": 0,
       "sensitivity": {
-        "state": "UNRESOLVED",
+        "state": "FIXED_COST_DRIVEN",
         "countDrivenChargeRefs": [],
         "volumeDrivenChargeRefs": [],
-        "fixedCostDrivenChargeRefs": [],
-        "unresolvedControllableChargeRefs": [],
-        "pricingPopulationRefs": [],
+        "mixedMinimumChargeRefs": [],
+        "fixedCostDrivenChargeRefs": [
+          "economic_charge_002"
+        ],
+        "unresolvedControllableChargeRefs": [
+          "economic_charge_005"
+        ],
+        "pricingPopulationRefs": [
+          "pricing_population_006",
+          "pricing_population_003"
+        ],
         "averageTicketFactRef": null,
         "averageTicketUsed": false,
         "additiveDriverContributionMinor": 0,
@@ -3371,14 +4586,18 @@
         "limitations": [
           "Sensitivity describes reproduced mechanics of exact provider-controlled current charges; it is not a market or savings judgment.",
           "Average ticket is preserved as context but is not used to manufacture a mechanic or primary-driver threshold.",
-          "No exact provider-controlled reproduced mechanic supports a sensitivity conclusion."
+          "Some exact provider-controlled charges lack a reproduced count, volume, or fixed-period mechanic.",
+          "Claim-scoped fixed-cost admissions extend sensitivity only where a known fixed RD amount, statement-explicit cadence, uniqueness, activity-independence, and non-overlap predicates pass; control remains a separate claim."
         ]
       },
       "incidence": {
         "state": "INCIDENCE_UNRESOLVED",
         "evidenceAccess": "UNRESOLVED",
         "evidenceRefs": [],
-        "grossProcessingCost": null,
+        "grossProcessingCost": {
+          "amountMinor": 4490,
+          "currency": "USD"
+        },
         "costOffsetRevenue": {
           "state": "UNKNOWN",
           "value": null,
@@ -3428,7 +4647,7 @@
         }
       ],
       "completeness": {
-        "profileState": "UNAVAILABLE_CURRENT_STATEMENT",
+        "profileState": "PARTIAL_CURRENT_STATEMENT",
         "observedActivityFields": [],
         "unresolvedActivityFields": [
           "processedVolume",
@@ -3447,15 +4666,14 @@
           "averageTicket",
           "channel"
         ],
-        "costMappingState": "RD_COST_UNAVAILABLE",
+        "costMappingState": "PARTIAL_RD_CHARGE_MAPPING",
         "pricingFormulaCoverage": "unresolved",
-        "feeLedgerReconciliation": "financially_unreconciled",
+        "feeLedgerReconciliation": "partial_but_financially_reconciled",
         "completeMerchantEconomicsClaimAllowed": false,
         "completeCostOfAcceptanceClaimAllowed": false,
         "limitations": [
           "Profile completeness applies only to current-statement economics; it is not pricing-formula completeness or complete cost of acceptance.",
           "One or more RD charges lack a deterministic governed Product-view mapping.",
-          "RD statement processing cost is financially unreconciled and remains unavailable to this profile.",
           "Unresolved activity fields remain visible and are not converted to zero."
         ]
       },
@@ -3473,8 +4691,8 @@
       "canonicalFingerprintBefore": "dcc50852dc98b4140f3af14dffafcf76ca1703690dab38311b12f50ddbfd5898",
       "canonicalFingerprintAfter": "dcc50852dc98b4140f3af14dffafcf76ca1703690dab38311b12f50ddbfd5898",
       "canonicalFingerprintInvariant": true,
-      "rdFingerprintBefore": "156807a585d3546295fe62cc19c0224ef284f470adf01118f656f7c45826a95b",
-      "rdFingerprintAfter": "156807a585d3546295fe62cc19c0224ef284f470adf01118f656f7c45826a95b",
+      "rdFingerprintBefore": "f7d216fd4fe27ccab791c7be0b8cef156ec465001b01b91b20f9bb1f9f06a593",
+      "rdFingerprintAfter": "f7d216fd4fe27ccab791c7be0b8cef156ec465001b01b91b20f9bb1f9f06a593",
       "rdFingerprintInvariant": true
     },
     {
@@ -3484,7 +4702,7 @@
         "start": "2024-12-01",
         "end": "2024-12-31"
       },
-      "profileState": "UNAVAILABLE_CURRENT_STATEMENT",
+      "profileState": "OBSERVED_RECONCILED",
       "activity": {
         "processedVolume": {
           "state": "UNKNOWN",
@@ -3695,22 +4913,53 @@
       ],
       "observedActivityFieldCount": 0,
       "unresolvedActivityFieldCount": 15,
-      "rdCostStackCompleteness": "financially_unreconciled",
-      "rdContributingChargeCount": 0,
-      "deterministicallyMappedChargeCount": 0,
+      "rdCostStackCompleteness": "partial_but_financially_reconciled",
+      "rdContributingChargeCount": 8,
+      "deterministicallyMappedChargeCount": 8,
       "unresolvedMappedChargeCount": 0,
-      "rdTotalStatementProcessingCostMinor": null,
-      "profileMappedNetMinor": 0,
-      "profileReconciliationDeltaMinor": null,
-      "reconcilesToRdTotal": false,
-      "productCostBuckets": [],
+      "rdTotalStatementProcessingCostMinor": 308282,
+      "profileMappedNetMinor": 308282,
+      "profileReconciliationDeltaMinor": 0,
+      "rdNonAdditiveRoundingResidual": null,
+      "reconcilesToRdTotal": true,
+      "productCostBuckets": [
+        {
+          "concept": "DISPUTE_CHARGEBACK_ECONOMICS",
+          "debitAmountMinor": 1500,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 1500,
+          "rdEconomicChargeRefs": [
+            "economic_charge_007"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "UNRESOLVED_SHARED_BUNDLED_ECONOMICS",
+          "debitAmountMinor": 306782,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 306782,
+          "rdEconomicChargeRefs": [
+            "economic_charge_001",
+            "economic_charge_002",
+            "economic_charge_003",
+            "economic_charge_004",
+            "economic_charge_005",
+            "economic_charge_006",
+            "economic_charge_008"
+          ],
+          "rdRemainderIncludedMinor": 0
+        }
+      ],
       "duplicateChargeContributionCount": 0,
       "nonFeePrincipalContributionCount": 0,
       "sensitivity": {
-        "state": "UNRESOLVED",
+        "state": "FIXED_COST_DRIVEN",
         "countDrivenChargeRefs": [],
         "volumeDrivenChargeRefs": [],
-        "fixedCostDrivenChargeRefs": [],
+        "mixedMinimumChargeRefs": [],
+        "fixedCostDrivenChargeRefs": [
+          "economic_charge_008"
+        ],
         "unresolvedControllableChargeRefs": [],
         "pricingPopulationRefs": [],
         "averageTicketFactRef": null,
@@ -3720,14 +4969,17 @@
         "limitations": [
           "Sensitivity describes reproduced mechanics of exact provider-controlled current charges; it is not a market or savings judgment.",
           "Average ticket is preserved as context but is not used to manufacture a mechanic or primary-driver threshold.",
-          "No exact provider-controlled reproduced mechanic supports a sensitivity conclusion."
+          "Claim-scoped fixed-cost admissions extend sensitivity only where a known fixed RD amount, statement-explicit cadence, uniqueness, activity-independence, and non-overlap predicates pass; control remains a separate claim."
         ]
       },
       "incidence": {
         "state": "INCIDENCE_UNRESOLVED",
         "evidenceAccess": "UNRESOLVED",
         "evidenceRefs": [],
-        "grossProcessingCost": null,
+        "grossProcessingCost": {
+          "amountMinor": 308282,
+          "currency": "USD"
+        },
         "costOffsetRevenue": {
           "state": "UNKNOWN",
           "value": null,
@@ -3777,7 +5029,7 @@
         }
       ],
       "completeness": {
-        "profileState": "UNAVAILABLE_CURRENT_STATEMENT",
+        "profileState": "OBSERVED_RECONCILED",
         "observedActivityFields": [],
         "unresolvedActivityFields": [
           "processedVolume",
@@ -3796,15 +5048,13 @@
           "averageTicket",
           "channel"
         ],
-        "costMappingState": "RD_COST_UNAVAILABLE",
+        "costMappingState": "ALL_RD_CONTRIBUTING_CHARGES_MAPPED",
         "pricingFormulaCoverage": "partial_observed_components",
-        "feeLedgerReconciliation": "financially_unreconciled",
+        "feeLedgerReconciliation": "partial_but_financially_reconciled",
         "completeMerchantEconomicsClaimAllowed": false,
         "completeCostOfAcceptanceClaimAllowed": false,
         "limitations": [
           "Profile completeness applies only to current-statement economics; it is not pricing-formula completeness or complete cost of acceptance.",
-          "One or more RD charges lack a deterministic governed Product-view mapping.",
-          "RD statement processing cost is financially unreconciled and remains unavailable to this profile.",
           "Unresolved activity fields remain visible and are not converted to zero."
         ]
       },
@@ -3822,8 +5072,8 @@
       "canonicalFingerprintBefore": "5b330c7b3634ce08ec02ddf16fbe4f5e0710ec6f1caa152a21c902ff4cd528b5",
       "canonicalFingerprintAfter": "5b330c7b3634ce08ec02ddf16fbe4f5e0710ec6f1caa152a21c902ff4cd528b5",
       "canonicalFingerprintInvariant": true,
-      "rdFingerprintBefore": "c527ff93a5d844ba614f4cc17fb8cd451bfb8bd25f28e12b2eb8388778b9ce69",
-      "rdFingerprintAfter": "c527ff93a5d844ba614f4cc17fb8cd451bfb8bd25f28e12b2eb8388778b9ce69",
+      "rdFingerprintBefore": "3690b8a6533a076d9da804cfc7f5bcd097e65d60fc70839481e7505d2b1c0fc1",
+      "rdFingerprintAfter": "3690b8a6533a076d9da804cfc7f5bcd097e65d60fc70839481e7505d2b1c0fc1",
       "rdFingerprintInvariant": true
     },
     {
@@ -3833,7 +5083,7 @@
         "start": "2024-09-01",
         "end": "2024-09-30"
       },
-      "profileState": "UNAVAILABLE_CURRENT_STATEMENT",
+      "profileState": "PARTIAL_CURRENT_STATEMENT",
       "activity": {
         "processedVolume": {
           "state": "UNKNOWN",
@@ -4045,24 +5295,206 @@
       ],
       "observedActivityFieldCount": 0,
       "unresolvedActivityFieldCount": 15,
-      "rdCostStackCompleteness": "financially_unreconciled",
-      "rdContributingChargeCount": 0,
-      "deterministicallyMappedChargeCount": 0,
-      "unresolvedMappedChargeCount": 0,
-      "rdTotalStatementProcessingCostMinor": null,
-      "profileMappedNetMinor": 0,
-      "profileReconciliationDeltaMinor": null,
-      "reconcilesToRdTotal": false,
-      "productCostBuckets": [],
+      "rdCostStackCompleteness": "partial_but_financially_reconciled",
+      "rdContributingChargeCount": 104,
+      "deterministicallyMappedChargeCount": 103,
+      "unresolvedMappedChargeCount": 1,
+      "rdTotalStatementProcessingCostMinor": 295438,
+      "profileMappedNetMinor": 295438,
+      "profileReconciliationDeltaMinor": 0,
+      "rdNonAdditiveRoundingResidual": null,
+      "reconcilesToRdTotal": true,
+      "productCostBuckets": [
+        {
+          "concept": "INTERCHANGE_ISSUER_ECONOMICS",
+          "debitAmountMinor": 149034,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 149034,
+          "rdEconomicChargeRefs": [
+            "economic_charge_004",
+            "economic_charge_005",
+            "economic_charge_006",
+            "economic_charge_007",
+            "economic_charge_008",
+            "economic_charge_009",
+            "economic_charge_010",
+            "economic_charge_012",
+            "economic_charge_013",
+            "economic_charge_014",
+            "economic_charge_015",
+            "economic_charge_016",
+            "economic_charge_017",
+            "economic_charge_018",
+            "economic_charge_019",
+            "economic_charge_020",
+            "economic_charge_021",
+            "economic_charge_022",
+            "economic_charge_024",
+            "economic_charge_025",
+            "economic_charge_026",
+            "economic_charge_027",
+            "economic_charge_028",
+            "economic_charge_032",
+            "economic_charge_036",
+            "economic_charge_037",
+            "economic_charge_038",
+            "economic_charge_039",
+            "economic_charge_042",
+            "economic_charge_043",
+            "economic_charge_045",
+            "economic_charge_046",
+            "economic_charge_048",
+            "economic_charge_049",
+            "economic_charge_050",
+            "economic_charge_052",
+            "economic_charge_054",
+            "economic_charge_055",
+            "economic_charge_057",
+            "economic_charge_059",
+            "economic_charge_079",
+            "economic_charge_080",
+            "economic_charge_081",
+            "economic_charge_082",
+            "economic_charge_083",
+            "economic_charge_084",
+            "economic_charge_085"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "CARD_NETWORK_ECONOMICS",
+          "debitAmountMinor": 22368,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 22368,
+          "rdEconomicChargeRefs": [
+            "economic_charge_001",
+            "economic_charge_030",
+            "economic_charge_031",
+            "economic_charge_047",
+            "economic_charge_056",
+            "economic_charge_071",
+            "economic_charge_073",
+            "economic_charge_075",
+            "economic_charge_078",
+            "economic_charge_086",
+            "economic_charge_088",
+            "economic_charge_089",
+            "economic_charge_099",
+            "economic_charge_100",
+            "economic_charge_102"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "PROVIDER_CONTROLLED_PERCENTAGE_ECONOMICS",
+          "debitAmountMinor": 13,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 13,
+          "rdEconomicChargeRefs": [
+            "economic_charge_087"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "PROVIDER_CONTROLLED_PER_ITEM_ECONOMICS",
+          "debitAmountMinor": 47284,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 47284,
+          "rdEconomicChargeRefs": [
+            "economic_charge_029",
+            "economic_charge_063",
+            "economic_charge_076",
+            "economic_charge_077",
+            "economic_charge_090"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "FIXED_ACCOUNT_SERVICE_ECONOMICS",
+          "debitAmountMinor": 2000,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 2000,
+          "rdEconomicChargeRefs": [
+            "economic_charge_094",
+            "economic_charge_104"
+          ],
+          "rdRemainderIncludedMinor": 0
+        },
+        {
+          "concept": "UNRESOLVED_SHARED_BUNDLED_ECONOMICS",
+          "debitAmountMinor": 74739,
+          "creditAmountMinor": 0,
+          "netAmountMinor": 74739,
+          "rdEconomicChargeRefs": [
+            "economic_charge_002",
+            "economic_charge_003",
+            "economic_charge_011",
+            "economic_charge_023",
+            "economic_charge_033",
+            "economic_charge_034",
+            "economic_charge_035",
+            "economic_charge_040",
+            "economic_charge_041",
+            "economic_charge_044",
+            "economic_charge_051",
+            "economic_charge_053",
+            "economic_charge_058",
+            "economic_charge_060",
+            "economic_charge_061",
+            "economic_charge_062",
+            "economic_charge_064",
+            "economic_charge_065",
+            "economic_charge_066",
+            "economic_charge_067",
+            "economic_charge_068",
+            "economic_charge_069",
+            "economic_charge_070",
+            "economic_charge_072",
+            "economic_charge_074",
+            "economic_charge_091",
+            "economic_charge_092",
+            "economic_charge_093",
+            "economic_charge_095",
+            "economic_charge_096",
+            "economic_charge_097",
+            "economic_charge_098",
+            "economic_charge_101",
+            "economic_charge_103"
+          ],
+          "rdRemainderIncludedMinor": 0
+        }
+      ],
       "duplicateChargeContributionCount": 0,
       "nonFeePrincipalContributionCount": 0,
       "sensitivity": {
-        "state": "UNRESOLVED",
-        "countDrivenChargeRefs": [],
-        "volumeDrivenChargeRefs": [],
-        "fixedCostDrivenChargeRefs": [],
+        "state": "MIXED",
+        "countDrivenChargeRefs": [
+          "economic_charge_029",
+          "economic_charge_063",
+          "economic_charge_076",
+          "economic_charge_077",
+          "economic_charge_090"
+        ],
+        "volumeDrivenChargeRefs": [
+          "economic_charge_087"
+        ],
+        "mixedMinimumChargeRefs": [
+          "economic_charge_002"
+        ],
+        "fixedCostDrivenChargeRefs": [
+          "economic_charge_094",
+          "economic_charge_097"
+        ],
         "unresolvedControllableChargeRefs": [],
-        "pricingPopulationRefs": [],
+        "pricingPopulationRefs": [
+          "pricing_population_002",
+          "pricing_population_004",
+          "pricing_population_011",
+          "pricing_population_017",
+          "pricing_population_018",
+          "pricing_population_021",
+          "pricing_population_024"
+        ],
         "averageTicketFactRef": null,
         "averageTicketUsed": false,
         "additiveDriverContributionMinor": 0,
@@ -4070,14 +5502,20 @@
         "limitations": [
           "Sensitivity describes reproduced mechanics of exact provider-controlled current charges; it is not a market or savings judgment.",
           "Average ticket is preserved as context but is not used to manufacture a mechanic or primary-driver threshold.",
-          "No exact provider-controlled reproduced mechanic supports a sensitivity conclusion."
+          "Some exact provider-controlled charges lack a reproduced count, volume, or fixed-period mechanic.",
+          "Claim-scoped volume admissions extend sensitivity only where exact governed base, rate, arithmetic, control, economic classification, and uniqueness predicates pass.",
+          "Claim-scoped mixed/minimum admissions extend sensitivity only where an exact governed minimum-applied-count relationship, operands, arithmetic, control, uniqueness, and non-overlap predicates pass.",
+          "Claim-scoped fixed-cost admissions extend sensitivity only where a known fixed RD amount, statement-explicit cadence, uniqueness, activity-independence, and non-overlap predicates pass; control remains a separate claim."
         ]
       },
       "incidence": {
         "state": "INCIDENCE_UNRESOLVED",
         "evidenceAccess": "UNRESOLVED",
         "evidenceRefs": [],
-        "grossProcessingCost": null,
+        "grossProcessingCost": {
+          "amountMinor": 295438,
+          "currency": "USD"
+        },
         "costOffsetRevenue": {
           "state": "UNKNOWN",
           "value": null,
@@ -4127,7 +5565,7 @@
         }
       ],
       "completeness": {
-        "profileState": "UNAVAILABLE_CURRENT_STATEMENT",
+        "profileState": "PARTIAL_CURRENT_STATEMENT",
         "observedActivityFields": [],
         "unresolvedActivityFields": [
           "processedVolume",
@@ -4146,15 +5584,14 @@
           "averageTicket",
           "channel"
         ],
-        "costMappingState": "RD_COST_UNAVAILABLE",
+        "costMappingState": "PARTIAL_RD_CHARGE_MAPPING",
         "pricingFormulaCoverage": "partial_observed_components",
-        "feeLedgerReconciliation": "financially_unreconciled",
+        "feeLedgerReconciliation": "partial_but_financially_reconciled",
         "completeMerchantEconomicsClaimAllowed": false,
         "completeCostOfAcceptanceClaimAllowed": false,
         "limitations": [
           "Profile completeness applies only to current-statement economics; it is not pricing-formula completeness or complete cost of acceptance.",
           "One or more RD charges lack a deterministic governed Product-view mapping.",
-          "RD statement processing cost is financially unreconciled and remains unavailable to this profile.",
           "Unresolved activity fields remain visible and are not converted to zero."
         ]
       },
@@ -4172,8 +5609,8 @@
       "canonicalFingerprintBefore": "b90facd3b79b7d04411cca90a1f2ba74653c510b146dc8456b64dd65e5027b78",
       "canonicalFingerprintAfter": "b90facd3b79b7d04411cca90a1f2ba74653c510b146dc8456b64dd65e5027b78",
       "canonicalFingerprintInvariant": true,
-      "rdFingerprintBefore": "45f3d372b31fa933211bc187b09c22c839f91b54570f9526e345be5b5e316c91",
-      "rdFingerprintAfter": "45f3d372b31fa933211bc187b09c22c839f91b54570f9526e345be5b5e316c91",
+      "rdFingerprintBefore": "76b97c2b028491fef1c41177aa6f2e42aa7e76f5d70629adc983da3b0d8a7ce4",
+      "rdFingerprintAfter": "76b97c2b028491fef1c41177aa6f2e42aa7e76f5d70629adc983da3b0d8a7ce4",
       "rdFingerprintInvariant": true
     }
   ],
@@ -4181,7 +5618,7 @@
     "exactElevenGoldStatements": true,
     "canonicalFinancialTruthInvariant11Of11": true,
     "rdArtifactInvariant11Of11": true,
-    "availableRdCostsReconcileExactly": true,
+    "availableRdCostsReconcileUnderGovernedControl": true,
     "commercialSourceCryptographicFingerprintInvariant": true,
     "rdRemainsSoleAdditiveAuthority": true,
     "unresolvedActivityNotZeroFilled": true,

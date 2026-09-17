@@ -16,7 +16,7 @@
     "normalPath": "ParsedDocument -> supported Fiserv parser -> canonical statement analysis -> governed payment knowledge/commercial decomposition -> internal commercial comparison -> merchant permission -> offline report-set arbitration",
     "downstreamSyntheticCommercialObjectsUsed": false,
     "behaviorCorrection": "Explicit settled-transaction, authorization-attempt, approved-authorization, gateway-transaction, and settled-batch populations are compared as distinct identities and fail closed when incompatible.",
-    "normalReportStillUsesFallbackArbitrationContext": true,
+    "normalReportStillUsesFallbackArbitrationContext": false,
     "customerRoutingChanged": false
   },
   "supportMatrix": [
@@ -443,14 +443,14 @@
     {
       "group": "comparison_arbitration",
       "field": "same-scope offsets",
-      "upstreamSource": "governed offer composition sibling components",
+      "upstreamSource": "governed offer composition plus all exact matched authorization components",
       "runtimeStage": "merchant permission offsetState",
-      "support": "DERIVABLE_WITHOUT_INVENTION",
-      "deterministic": false,
+      "support": "DIRECTLY_AVAILABLE",
+      "deterministic": true,
       "claimSpecific": true,
-      "safeForCommercialComparison": "conditional",
-      "limitation": "The normal path can identify incomplete scope but cannot infer missing offsets.",
-      "smallestCapabilityNeeded": "Admit complete same-scope commercial components or retain incomplete."
+      "safeForCommercialComparison": "yes",
+      "limitation": "Completeness is closed only inside the per-authorization component scope; other component classes are not aggregated.",
+      "smallestCapabilityNeeded": "Retain incomplete when any relevant authorization component is not bound."
     },
     {
       "group": "comparison_arbitration",
@@ -467,26 +467,26 @@
     {
       "group": "comparison_arbitration",
       "field": "evidence strength/claim ceiling",
-      "upstreamSource": "diagnostic comparison strength, finding evidence, and permission gates",
-      "runtimeStage": "internal finding and merchant permission",
-      "support": "PARTIAL",
+      "upstreamSource": "diagnostic comparison strength and three-way runtime evidence binding",
+      "runtimeStage": "runtime-bound report-set candidate context",
+      "support": "DIRECTLY_AVAILABLE",
       "deterministic": true,
       "claimSpecific": true,
-      "safeForCommercialComparison": "conditional",
-      "limitation": "The report-set normal call currently falls back to medium/unresolved context instead of a first-class runtime evidence-strength binding.",
-      "smallestCapabilityNeeded": "Bind claim-specific evidence strength into report-set candidate context."
+      "safeForCommercialComparison": "yes",
+      "limitation": "Implemented for provider-controlled per-authorization candidates only.",
+      "smallestCapabilityNeeded": "Add the same first-class evidence ceiling when another component class is authorized."
     },
     {
       "group": "comparison_arbitration",
       "field": "invalidating VERIFY dependency",
-      "upstreamSource": "relationship between an unresolved merchant fact and a specific review",
+      "upstreamSource": "failed runtime channel/population/policy gate and its exact merchant-verifiable fact",
       "runtimeStage": "report-set arbitration input",
-      "support": "ABSENT",
+      "support": "DIRECTLY_AVAILABLE",
       "deterministic": true,
       "claimSpecific": true,
-      "safeForCommercialComparison": "no",
-      "limitation": "The arbitration accepts this relationship, but the normal runtime does not construct it.",
-      "smallestCapabilityNeeded": "Generate an evidence-bound verifyCandidateId to reviewCandidateId dependency."
+      "safeForCommercialComparison": "yes",
+      "limitation": "Constructed only when the missing fact can invalidate or materially change the authorization review path.",
+      "smallestCapabilityNeeded": null
     },
     {
       "group": "comparison_arbitration",
@@ -504,13 +504,13 @@
       "group": "comparison_arbitration",
       "field": "consolidation compatibility",
       "upstreamSource": "component, population, channel, program, offer, and pricing identity",
-      "runtimeStage": "report-set candidate context",
-      "support": "PARTIAL",
+      "runtimeStage": "runtime-bound report-set candidate context",
+      "support": "DIRECTLY_AVAILABLE",
       "deterministic": true,
       "claimSpecific": true,
-      "safeForCommercialComparison": "conditional",
-      "limitation": "Upstream facts exist for supported authorization attempts, but normal report construction uses fallback unresolved channel/program fields.",
-      "smallestCapabilityNeeded": "Build report-set candidate contexts from runtime candidates."
+      "safeForCommercialComparison": "yes",
+      "limitation": "Implemented for provider-controlled per-authorization candidates only.",
+      "smallestCapabilityNeeded": null
     },
     {
       "group": "comparison_arbitration",
@@ -540,12 +540,12 @@
   "componentClasses": [
     {
       "componentClass": "per_authorization",
-      "support": "PARTIAL",
-      "disposition": "runtime_partial",
-      "comparisonStageReached": "Normal Fiserv parsing can establish exact provider-controlled rows, exact counts, channel/brand scope, governed alternatives, and matched-component arithmetic.",
-      "actionReadiness": "Permission and report arbitration run, but normal-path public-policy facts, complete commercial denominator/offset scope, and first-class arbitration context may still block merchant pricing review.",
-      "failClosedReason": "A matched internal component comparison does not by itself authorize REVIEW_CURRENT_PRICING.",
-      "smallestCapabilityNeeded": "Bind claim-specific public-policy facts, complete same-scope economics/offsets, and report-set context from runtime evidence."
+      "support": "DIRECTLY_AVAILABLE",
+      "disposition": "runtime_ready",
+      "comparisonStageReached": "The normal Fiserv path establishes exact provider-controlled authorization rows, typed populations and counts, channel/program scope, governed alternatives, policy context, same-authorization-scope offsets, comparison, permission, and report arbitration.",
+      "actionReadiness": "REVIEW_CURRENT_PRICING is available only for an exact, material, policy-permitted, non-reversing component comparison; unresolved facts construct a fail-closed VERIFY dependency.",
+      "failClosedReason": null,
+      "smallestCapabilityNeeded": null
     },
     {
       "componentClass": "gateway_transaction",
@@ -709,35 +709,37 @@
       },
       {
         "caseId": "invalidating_verify_dependency",
-        "support": "ABSENT",
+        "support": "DERIVABLE_WITHOUT_INVENTION",
         "pass": true,
         "normalPath": true,
         "comparisonPerformed": false,
         "pricingReviewAction": false,
-        "outcome": "The arbitration can consume an invalidating VERIFY dependency, but normal runtime construction does not create one.",
-        "smallestUnlocker": "Evidence-bound VERIFY-to-REVIEW relationship construction."
+        "outcome": "The normal runtime constructs an evidence-bound invalidating VERIFY dependency without granting review or customer action authority.",
+        "smallestUnlocker": null
       }
     ],
     "observed": {
       "currentComponents": 5,
       "exactCurrentComponents": 5,
       "boundedCurrentComponents": 0,
-      "matchedComparisons": 9,
-      "blockedComparisons": 9,
-      "comparisonsWithThreeEvidenceBindings": 9,
-      "merchantPermissionDecisions": 18,
+      "matchedComparisons": 8,
+      "blockedComparisons": 8,
+      "comparisonsWithThreeEvidenceBindings": 8,
+      "merchantPermissionDecisions": 16,
       "pricingReviewActions": 0,
-      "reportSetLedgerEntries": 18,
+      "reportSetLedgerEntries": 16,
       "reportSetPlacedItems": 0,
-      "invalidatingVerifyDependenciesConstructedByNormalPath": 0,
+      "invalidatingVerifyDependenciesConstructedByNormalPath": 1,
+      "fallbackArbitrationContexts": 0,
       "disputeRiskLinksConstructedByNormalPath": 0
     },
     "result": "12/12 passed"
   },
   "answerByComponentClass": {
-    "runtimeReady": [],
+    "runtimeReady": [
+      "per_authorization"
+    ],
     "runtimePartial": [
-      "per_authorization",
       "gateway_transaction",
       "gateway_batch"
     ],
@@ -746,8 +748,8 @@
       "fixed_monthly",
       "episodic_chargeback"
     ],
-    "answer": "NO_FULL_COMPONENT_CLASS_YET",
-    "plainLanguage": "No component class yet supplies every merchant-action and report-arbitration binding through the normal path. Per-authorization is closest: matched internal arithmetic is real, but public-policy facts, complete same-scope economics/offsets, and first-class arbitration context still gate action. Gateway families remain partial; percentage, fixed-monthly, and episodic chargeback remain fail closed."
+    "answer": "YES_FOR_SOME_NOT_ALL",
+    "plainLanguage": "No component class yet supplies every merchant-action binding through the normal path. Per-authorization now has first-class arbitration context and an evidence-bound invalidating VERIFY dependency, while public-policy facts and complete same-scope economics/offsets still gate action. Gateway families remain partial; percentage, fixed-monthly, and episodic chargeback remain fail closed."
   },
   "gold": {
     "statements": [

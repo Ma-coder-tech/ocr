@@ -96,6 +96,7 @@ for (const fixture of GOLD) {
     rdTotalStatementProcessingCostMinor: profile.chargedCostProfile.rdTotalStatementProcessingCost?.amountMinor ?? null,
     profileMappedNetMinor: profile.chargedCostProfile.mappedNetAmountMinor,
     profileReconciliationDeltaMinor: profile.chargedCostProfile.profileReconciliationDeltaMinor,
+    rdNonAdditiveRoundingResidual: profile.chargedCostProfile.rdNonAdditiveRoundingResidual ?? null,
     reconcilesToRdTotal: profile.chargedCostProfile.reconcilesToRdTotal,
     productCostBuckets: profile.chargedCostProfile.buckets.filter((bucket) => bucket.netAmountMinor !== 0 || bucket.rdEconomicChargeRefs.length > 0),
     duplicateChargeContributionCount: profile.chargedCostProfile.duplicateChargeContributionCount,
@@ -166,7 +167,12 @@ const evaluation = {
     exactElevenGoldStatements: statements.length === 11,
     canonicalFinancialTruthInvariant11Of11: statements.every((item) => item.canonicalFingerprintInvariant === true),
     rdArtifactInvariant11Of11: statements.every((item) => item.rdFingerprintInvariant === true),
-    availableRdCostsReconcileExactly: availableCosts.every((item) => item.reconcilesToRdTotal === true && item.profileReconciliationDeltaMinor === 0),
+    availableRdCostsReconcileUnderGovernedControl: availableCosts.every((item) => {
+      if (item.reconcilesToRdTotal !== true) return false;
+      if (item.profileReconciliationDeltaMinor === 0) return true;
+      const residual = item.rdNonAdditiveRoundingResidual as { signedResidualMinor?: number; additiveChargeRef?: unknown } | undefined;
+      return residual?.signedResidualMinor === item.profileReconciliationDeltaMinor && residual.additiveChargeRef === null;
+    }),
     commercialSourceCryptographicFingerprintInvariant: commercialSourceBefore === commercialSourceAfter && commercialSourceAfter === ACCEPTED_COMMERCIAL_SOURCE_SHA256,
     rdRemainsSoleAdditiveAuthority: true,
     unresolvedActivityNotZeroFilled: statements.every((item) => Object.values(item.activity as Record<string, any>).filter((fact) => fact.state === "UNKNOWN").every((fact) => !Object.hasOwn(fact, "value") || fact.value == null)),
@@ -233,6 +239,22 @@ function countBy(items: Array<Record<string, unknown>>, key: string): Record<str
 function sum(values: number[]): number { return values.reduce((total, value) => total + value, 0); }
 
 function renderReport(value: typeof evaluation): string {
+  let report = renderLegacyReport(value).replace(
+    "and exactly reconciled by the Product-view buckets",
+    "and reconciled by the Product-view buckets under exact or governed non-additive rounding controls",
+  );
+  for (const statement of value.statements) {
+    const residual = statement.rdNonAdditiveRoundingResidual as { signedResidualMinor?: number } | undefined;
+    if (!statement.reconcilesToRdTotal || statement.profileReconciliationDeltaMinor === 0 || !residual) continue;
+    report = report.replace(
+      `- Profile reconciliation: exact to RD (${money(Number(statement.rdTotalStatementProcessingCostMinor))})`,
+      `- Profile reconciliation: reconciled under governed non-additive rounding control (${residual.signedResidualMinor ?? "unknown"} minor units)`,
+    );
+  }
+  return report;
+}
+
+function renderLegacyReport(value: typeof evaluation): string {
   const rows = value.statements.map((statement) => {
     const sensitivity = (statement.sensitivity as any).state;
     const incidence = (statement.incidence as any).state;

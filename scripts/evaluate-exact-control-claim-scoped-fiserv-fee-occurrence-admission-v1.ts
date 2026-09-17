@@ -75,9 +75,11 @@ for (const fixture of GOLD) {
   const knowledge = authority.resolveStatement({ analysis: canonical, context: US_CONTEXT, suppliedPricingObservation: pricing });
   const decomposition = buildCommercialDecompositionContractV1({ analysis: canonical, knowledge });
   const before = buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing(inspected.pricing);
-  const after = inspected.economic;
-  const occurrenceRows = fiservFeeLedgerOccurrences(inspected.observationalFoundation);
   const admission = inspected.feeOccurrenceAdmission!;
+  const after = buildCapabilityBoundCanonicalEconomicsV2FromFiservPricing(
+    inspected.pricing, [], [], admission, null,
+  );
+  const occurrenceRows = fiservFeeLedgerOccurrences(inspected.observationalFoundation);
   const beforeContributing = new Set(before.economicLayer.charges
     .filter((charge) => charge.contributionStatus.startsWith("contributes_"))
     .map((charge) => charge.contributingOccurrenceRef).filter((ref): ref is string => Boolean(ref)));

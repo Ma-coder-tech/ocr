@@ -112,6 +112,43 @@ describe("Single-Statement Current Relationship Economics Profile v1", () => {
     });
   });
 
+  it("reconciles only through governed non-additive rounding metadata without changing charge amounts", () => {
+    const economic = cloneEconomic();
+    economic.economicLayer.costStack.authoritativeStatementFeeTotal = { amountMinor: 4_499, currency: "USD" };
+    economic.economicLayer.costStack.totalStatementProcessingCost = { amountMinor: 4_499, currency: "USD" };
+    economic.economicLayer.costStack.reconciliationDeltaMinor = -1;
+    economic.economicLayer.costStack.roundingResidual = {
+      policyVersion: "fiserv_fee_total_nonadditive_rounding_residual_max_2_minor_units_v1",
+      state: "accepted_bounded_rounding_nonadditive",
+      printedStatementFeeTotalMinor: 4_499,
+      admittedFeeOccurrenceSumMinor: 4_500,
+      signedResidualMinor: -1,
+      absoluteResidualMinor: 1,
+      maximumAcceptedAbsoluteResidualMinor: 2,
+      controlRef: "control:test-rounding",
+      evidenceRefs: ["evidence:test-rounding"],
+      reasonCode: "bounded_rounding_reconciles_complete_fee_population",
+      additiveChargeRef: null,
+      category: null,
+      participantOrOwner: null,
+    };
+
+    const result = profile(economic);
+    expect(result.chargedCostProfile).toMatchObject({
+      mappedNetAmountMinor: 4_500,
+      profileReconciliationDeltaMinor: -1,
+      reconcilesToRdTotal: true,
+      rdNonAdditiveRoundingResidual: {
+        signedResidualMinor: -1,
+        additiveChargeRef: null,
+        category: null,
+        participantOrOwner: null,
+      },
+    });
+    expect(result.chargedCostProfile.items.reduce((sum, item) =>
+      sum + (item.financialDirection === "debit" ? item.amount.amountMinor : -item.amount.amountMinor), 0)).toBe(4_500);
+  });
+
   it("keeps a missing or ambiguous governed bridge in the unresolved Product-view bucket", () => {
     const decomposition = decomp().contract;
     decomposition.rows = decomposition.rows.filter((row) => row.printedLabel !== "Statement fee");

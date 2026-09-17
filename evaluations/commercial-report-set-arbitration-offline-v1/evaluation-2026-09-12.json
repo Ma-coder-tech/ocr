@@ -83,9 +83,9 @@
         "canonicalFingerprintBefore": "568968da58d41d4092e86161cbf9997620422b1bf6c375bca5fc89fd7a27c445",
         "canonicalFingerprintAfter": "568968da58d41d4092e86161cbf9997620422b1bf6c375bca5fc89fd7a27c445",
         "canonicalInvariant": true,
-        "internalCommercialDecisions": 18,
+        "internalCommercialDecisions": 16,
         "dispositions": {
-          "withheld_in_unable_experience": 18
+          "withheld_in_unable_experience": 16
         },
         "placed": {
           "pricingReview": 0,
@@ -116,9 +116,9 @@
         "canonicalFingerprintBefore": "2d4f037913eae4907fed3c2912dba6aa55eda8e5c2f472ef1d14b053f0585cab",
         "canonicalFingerprintAfter": "2d4f037913eae4907fed3c2912dba6aa55eda8e5c2f472ef1d14b053f0585cab",
         "canonicalInvariant": true,
-        "internalCommercialDecisions": 18,
+        "internalCommercialDecisions": 16,
         "dispositions": {
-          "withheld_in_unable_experience": 18
+          "withheld_in_unable_experience": 16
         },
         "placed": {
           "pricingReview": 0,
@@ -397,9 +397,9 @@
         "canonicalFingerprintBefore": "b90facd3b79b7d04411cca90a1f2ba74653c510b146dc8456b64dd65e5027b78",
         "canonicalFingerprintAfter": "b90facd3b79b7d04411cca90a1f2ba74653c510b146dc8456b64dd65e5027b78",
         "canonicalInvariant": true,
-        "internalCommercialDecisions": 18,
+        "internalCommercialDecisions": 16,
         "dispositions": {
-          "withheld_in_unable_experience": 18
+          "withheld_in_unable_experience": 16
         },
         "placed": {
           "pricingReview": 0,
@@ -423,7 +423,7 @@
     ],
     "totals": {
       "statements": 11,
-      "internalCommercialDecisions": 54,
+      "internalCommercialDecisions": 48,
       "pricingReview": 0,
       "verify": 0,
       "explain": 0,

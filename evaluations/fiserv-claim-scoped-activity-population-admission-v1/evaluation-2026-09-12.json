@@ -878,15 +878,21 @@
       "canonicalFingerprintBefore": "568968da58d41d4092e86161cbf9997620422b1bf6c375bca5fc89fd7a27c445",
       "canonicalFingerprintAfter": "568968da58d41d4092e86161cbf9997620422b1bf6c375bca5fc89fd7a27c445",
       "canonicalInvariant": true,
-      "rdFingerprintBefore": "afa19272c973a1d302be9e1f0ac2a853e66e123c04ee76fec5a05dd70b2abe27",
-      "rdFingerprintAfter": "afa19272c973a1d302be9e1f0ac2a853e66e123c04ee76fec5a05dd70b2abe27",
+      "rdFingerprintBefore": "cba4d7deb8c066a273efbb902c2d9b95668d7651ee30d0641df34afab340878d",
+      "rdFingerprintAfter": "cba4d7deb8c066a273efbb902c2d9b95668d7651ee30d0641df34afab340878d",
       "rdInvariant": true,
-      "rdChargeCountBefore": 137,
-      "rdChargeCountAfter": 137,
-      "rdFeeTotalBefore": null,
-      "rdFeeTotalAfter": null,
-      "chargedCostProfileFingerprintBefore": "c5d0275bfc0398630b479a49a9e5e3922e194ea079234aa3d3f68816c3342a32",
-      "chargedCostProfileFingerprintAfter": "c5d0275bfc0398630b479a49a9e5e3922e194ea079234aa3d3f68816c3342a32",
+      "rdChargeCountBefore": 134,
+      "rdChargeCountAfter": 134,
+      "rdFeeTotalBefore": {
+        "amountMinor": 133096,
+        "currency": "USD"
+      },
+      "rdFeeTotalAfter": {
+        "amountMinor": 133096,
+        "currency": "USD"
+      },
+      "chargedCostProfileFingerprintBefore": "4eb7967d2ea631803d277d84f877b6cca0483e10aa2921c773b242654e22553c",
+      "chargedCostProfileFingerprintAfter": "4eb7967d2ea631803d277d84f877b6cca0483e10aa2921c773b242654e22553c",
       "inferredZeroFields": [],
       "admissionSafety": {
         "exactPopulationIdentityRequired": true,
@@ -2945,11 +2951,11 @@
       "canonicalFingerprintBefore": "183e033028de664a920d042ed84bcd2038db0e32312e951561daac7fb34dee96",
       "canonicalFingerprintAfter": "183e033028de664a920d042ed84bcd2038db0e32312e951561daac7fb34dee96",
       "canonicalInvariant": true,
-      "rdFingerprintBefore": "b3dfd4e1237aca42a55d2adc3e0a3da2728de7342a302304e44146c9375453af",
-      "rdFingerprintAfter": "b3dfd4e1237aca42a55d2adc3e0a3da2728de7342a302304e44146c9375453af",
+      "rdFingerprintBefore": "f179da25f63709211b36b58ede37393b6a41167d33db3ee298a1bff5bee79ca7",
+      "rdFingerprintAfter": "f179da25f63709211b36b58ede37393b6a41167d33db3ee298a1bff5bee79ca7",
       "rdInvariant": true,
-      "rdChargeCountBefore": 0,
-      "rdChargeCountAfter": 0,
+      "rdChargeCountBefore": 50,
+      "rdChargeCountAfter": 50,
       "rdFeeTotalBefore": {
         "amountMinor": 9119,
         "currency": "USD"
@@ -2958,8 +2964,8 @@
         "amountMinor": 9119,
         "currency": "USD"
       },
-      "chargedCostProfileFingerprintBefore": "e15237d17edaf84dd2b7b56386b0c1bf2e4d36ac634af0d62a39d06fb162b509",
-      "chargedCostProfileFingerprintAfter": "e15237d17edaf84dd2b7b56386b0c1bf2e4d36ac634af0d62a39d06fb162b509",
+      "chargedCostProfileFingerprintBefore": "ede35c2002532495b83660dfe3f900057168ef0037151d0aea70d03e83c47ec1",
+      "chargedCostProfileFingerprintAfter": "ede35c2002532495b83660dfe3f900057168ef0037151d0aea70d03e83c47ec1",
       "inferredZeroFields": [],
       "admissionSafety": {
         "exactPopulationIdentityRequired": true,
@@ -3613,11 +3619,11 @@
       "canonicalFingerprintBefore": "6bc9ecdaac7833f85d4e9ec533355966b4898285eb14ce90d46de8574581a471",
       "canonicalFingerprintAfter": "6bc9ecdaac7833f85d4e9ec533355966b4898285eb14ce90d46de8574581a471",
       "canonicalInvariant": true,
-      "rdFingerprintBefore": "f60b87e70dc0a3424bdb33e278d7da24b87b17d1fbcf686d3dbd4f804f16af70",
-      "rdFingerprintAfter": "f60b87e70dc0a3424bdb33e278d7da24b87b17d1fbcf686d3dbd4f804f16af70",
+      "rdFingerprintBefore": "c81f3a73f3bac5c4bb5e80ff9270b1165eb073ac203574985dbde4cc6e62fa60",
+      "rdFingerprintAfter": "c81f3a73f3bac5c4bb5e80ff9270b1165eb073ac203574985dbde4cc6e62fa60",
       "rdInvariant": true,
-      "rdChargeCountBefore": 111,
-      "rdChargeCountAfter": 111,
+      "rdChargeCountBefore": 105,
+      "rdChargeCountAfter": 105,
       "rdFeeTotalBefore": {
         "amountMinor": 355245,
         "currency": "USD"
@@ -3626,8 +3632,8 @@
         "amountMinor": 355245,
         "currency": "USD"
       },
-      "chargedCostProfileFingerprintBefore": "4a9bd96b4bfa919a6e547405a2c80f4f15a84e26ef81f750a8080761b27ad6cd",
-      "chargedCostProfileFingerprintAfter": "4a9bd96b4bfa919a6e547405a2c80f4f15a84e26ef81f750a8080761b27ad6cd",
+      "chargedCostProfileFingerprintBefore": "562f4df50b7f0106f54cf4dcf145732ce6f4439df9ec8d3f2abe4eb8aed0fb85",
+      "chargedCostProfileFingerprintAfter": "562f4df50b7f0106f54cf4dcf145732ce6f4439df9ec8d3f2abe4eb8aed0fb85",
       "inferredZeroFields": [],
       "admissionSafety": {
         "exactPopulationIdentityRequired": true,
@@ -4306,11 +4312,11 @@
       "canonicalFingerprintBefore": "fc0ea14383eecfafa3a7e9a6b3fc702208fafc79f8525906f24b341d89e22ba9",
       "canonicalFingerprintAfter": "fc0ea14383eecfafa3a7e9a6b3fc702208fafc79f8525906f24b341d89e22ba9",
       "canonicalInvariant": true,
-      "rdFingerprintBefore": "945bc0b7684c1c4f06083f70f8b8d3e602abbfc309bdf91be5f5c969b3f40566",
-      "rdFingerprintAfter": "945bc0b7684c1c4f06083f70f8b8d3e602abbfc309bdf91be5f5c969b3f40566",
+      "rdFingerprintBefore": "e917a1998fa7b9fcf47d0b1ab8e533ff4fc9077044bd4a5249f26e829330b4b7",
+      "rdFingerprintAfter": "e917a1998fa7b9fcf47d0b1ab8e533ff4fc9077044bd4a5249f26e829330b4b7",
       "rdInvariant": true,
-      "rdChargeCountBefore": 70,
-      "rdChargeCountAfter": 70,
+      "rdChargeCountBefore": 61,
+      "rdChargeCountAfter": 61,
       "rdFeeTotalBefore": {
         "amountMinor": 200773,
         "currency": "USD"
@@ -4319,8 +4325,8 @@
         "amountMinor": 200773,
         "currency": "USD"
       },
-      "chargedCostProfileFingerprintBefore": "b0bba091bcad54bcad082da4fd3b55293fad5460b1d23b8f6348883cca454ba4",
-      "chargedCostProfileFingerprintAfter": "b0bba091bcad54bcad082da4fd3b55293fad5460b1d23b8f6348883cca454ba4",
+      "chargedCostProfileFingerprintBefore": "8256f455c9b8ec0c89cc95aa458281922316eb5218a7d44769e30ce7799b644d",
+      "chargedCostProfileFingerprintAfter": "8256f455c9b8ec0c89cc95aa458281922316eb5218a7d44769e30ce7799b644d",
       "inferredZeroFields": [],
       "admissionSafety": {
         "exactPopulationIdentityRequired": true,
@@ -4923,11 +4929,11 @@
       "canonicalFingerprintBefore": "2017b752dba2a06a1c352071abdf5df3541f172015b9a54d81afec33a61d3a6e",
       "canonicalFingerprintAfter": "2017b752dba2a06a1c352071abdf5df3541f172015b9a54d81afec33a61d3a6e",
       "canonicalInvariant": true,
-      "rdFingerprintBefore": "af19baf0a6562e538c3c2324d0137d425ea957e2295059b71c64b92fb0cf1f5f",
-      "rdFingerprintAfter": "af19baf0a6562e538c3c2324d0137d425ea957e2295059b71c64b92fb0cf1f5f",
+      "rdFingerprintBefore": "aa5ca7a74c607c163fd49b9045d80f0e8b2567e81865a36d6cdc5701eb50cb90",
+      "rdFingerprintAfter": "aa5ca7a74c607c163fd49b9045d80f0e8b2567e81865a36d6cdc5701eb50cb90",
       "rdInvariant": true,
-      "rdChargeCountBefore": 31,
-      "rdChargeCountAfter": 31,
+      "rdChargeCountBefore": 22,
+      "rdChargeCountAfter": 22,
       "rdFeeTotalBefore": {
         "amountMinor": 156573,
         "currency": "USD"
@@ -4936,8 +4942,8 @@
         "amountMinor": 156573,
         "currency": "USD"
       },
-      "chargedCostProfileFingerprintBefore": "565f5226923a25bc1ba6923298749a8254c83ac8c97e94c9d5f0ef552540a9d0",
-      "chargedCostProfileFingerprintAfter": "565f5226923a25bc1ba6923298749a8254c83ac8c97e94c9d5f0ef552540a9d0",
+      "chargedCostProfileFingerprintBefore": "4baf6c25370a82e865e12b1b00b9ed1f4b645cdef452b8d9bf232508450f889a",
+      "chargedCostProfileFingerprintAfter": "4baf6c25370a82e865e12b1b00b9ed1f4b645cdef452b8d9bf232508450f889a",
       "inferredZeroFields": [],
       "admissionSafety": {
         "exactPopulationIdentityRequired": true,
@@ -5573,11 +5579,11 @@
       "canonicalFingerprintBefore": "fd5fee9b7e616581bf393d5b2d12ea5b010e31e8f169f5adbed5a26ebf0b9c4b",
       "canonicalFingerprintAfter": "fd5fee9b7e616581bf393d5b2d12ea5b010e31e8f169f5adbed5a26ebf0b9c4b",
       "canonicalInvariant": true,
-      "rdFingerprintBefore": "a0553581d3068078168195273fec0b319255665adcb84ae8fc1d63033a45865f",
-      "rdFingerprintAfter": "a0553581d3068078168195273fec0b319255665adcb84ae8fc1d63033a45865f",
+      "rdFingerprintBefore": "8e27ad57e3b7e383b7d368ca9a81e64130473aa8e05630a500ff076d259b05bf",
+      "rdFingerprintAfter": "8e27ad57e3b7e383b7d368ca9a81e64130473aa8e05630a500ff076d259b05bf",
       "rdInvariant": true,
-      "rdChargeCountBefore": 53,
-      "rdChargeCountAfter": 53,
+      "rdChargeCountBefore": 42,
+      "rdChargeCountAfter": 42,
       "rdFeeTotalBefore": {
         "amountMinor": 37855,
         "currency": "USD"
@@ -5586,8 +5592,8 @@
         "amountMinor": 37855,
         "currency": "USD"
       },
-      "chargedCostProfileFingerprintBefore": "893209e867d4c81e5750b8f583b1d2a02b98d49a28610d91c618b1cd2111d083",
-      "chargedCostProfileFingerprintAfter": "893209e867d4c81e5750b8f583b1d2a02b98d49a28610d91c618b1cd2111d083",
+      "chargedCostProfileFingerprintBefore": "52fac9ef837ac286d94481e06b0044f1af53b013410c3a4fa6555f39d7478309",
+      "chargedCostProfileFingerprintAfter": "52fac9ef837ac286d94481e06b0044f1af53b013410c3a4fa6555f39d7478309",
       "inferredZeroFields": [],
       "admissionSafety": {
         "exactPopulationIdentityRequired": true,
@@ -6168,11 +6174,11 @@
       "canonicalFingerprintBefore": "dcc50852dc98b4140f3af14dffafcf76ca1703690dab38311b12f50ddbfd5898",
       "canonicalFingerprintAfter": "dcc50852dc98b4140f3af14dffafcf76ca1703690dab38311b12f50ddbfd5898",
       "canonicalInvariant": true,
-      "rdFingerprintBefore": "156807a585d3546295fe62cc19c0224ef284f470adf01118f656f7c45826a95b",
-      "rdFingerprintAfter": "156807a585d3546295fe62cc19c0224ef284f470adf01118f656f7c45826a95b",
+      "rdFingerprintBefore": "f7d216fd4fe27ccab791c7be0b8cef156ec465001b01b91b20f9bb1f9f06a593",
+      "rdFingerprintAfter": "f7d216fd4fe27ccab791c7be0b8cef156ec465001b01b91b20f9bb1f9f06a593",
       "rdInvariant": true,
-      "rdChargeCountBefore": 9,
-      "rdChargeCountAfter": 9,
+      "rdChargeCountBefore": 5,
+      "rdChargeCountAfter": 5,
       "rdFeeTotalBefore": {
         "amountMinor": 4490,
         "currency": "USD"
@@ -6181,8 +6187,8 @@
         "amountMinor": 4490,
         "currency": "USD"
       },
-      "chargedCostProfileFingerprintBefore": "7283ae6c6e869e812f503f4d0b1037d48b19058d060ea15524a6c5959808836f",
-      "chargedCostProfileFingerprintAfter": "7283ae6c6e869e812f503f4d0b1037d48b19058d060ea15524a6c5959808836f",
+      "chargedCostProfileFingerprintBefore": "0b8d8bd243d5c54bcf231754ba126a7f7c4eedf327457c1497704e9169f1de38",
+      "chargedCostProfileFingerprintAfter": "0b8d8bd243d5c54bcf231754ba126a7f7c4eedf327457c1497704e9169f1de38",
       "inferredZeroFields": [],
       "admissionSafety": {
         "exactPopulationIdentityRequired": true,
@@ -6834,11 +6840,11 @@
       "canonicalFingerprintBefore": "5b330c7b3634ce08ec02ddf16fbe4f5e0710ec6f1caa152a21c902ff4cd528b5",
       "canonicalFingerprintAfter": "5b330c7b3634ce08ec02ddf16fbe4f5e0710ec6f1caa152a21c902ff4cd528b5",
       "canonicalInvariant": true,
-      "rdFingerprintBefore": "c527ff93a5d844ba614f4cc17fb8cd451bfb8bd25f28e12b2eb8388778b9ce69",
-      "rdFingerprintAfter": "c527ff93a5d844ba614f4cc17fb8cd451bfb8bd25f28e12b2eb8388778b9ce69",
+      "rdFingerprintBefore": "3690b8a6533a076d9da804cfc7f5bcd097e65d60fc70839481e7505d2b1c0fc1",
+      "rdFingerprintAfter": "3690b8a6533a076d9da804cfc7f5bcd097e65d60fc70839481e7505d2b1c0fc1",
       "rdInvariant": true,
-      "rdChargeCountBefore": 17,
-      "rdChargeCountAfter": 17,
+      "rdChargeCountBefore": 8,
+      "rdChargeCountAfter": 8,
       "rdFeeTotalBefore": {
         "amountMinor": 308282,
         "currency": "USD"
@@ -6847,8 +6853,8 @@
         "amountMinor": 308282,
         "currency": "USD"
       },
-      "chargedCostProfileFingerprintBefore": "239ce6211ba9db4c98e195862370042ccef5a1b4560829ab2bcb80c4dfc73180",
-      "chargedCostProfileFingerprintAfter": "239ce6211ba9db4c98e195862370042ccef5a1b4560829ab2bcb80c4dfc73180",
+      "chargedCostProfileFingerprintBefore": "ef30bb4e7d3d8a2126f008e1e8d9e29fb7ece45692ad92b05322a6628d828e9d",
+      "chargedCostProfileFingerprintAfter": "ef30bb4e7d3d8a2126f008e1e8d9e29fb7ece45692ad92b05322a6628d828e9d",
       "inferredZeroFields": [],
       "admissionSafety": {
         "exactPopulationIdentityRequired": true,
@@ -7524,11 +7530,11 @@
       "canonicalFingerprintBefore": "b90facd3b79b7d04411cca90a1f2ba74653c510b146dc8456b64dd65e5027b78",
       "canonicalFingerprintAfter": "b90facd3b79b7d04411cca90a1f2ba74653c510b146dc8456b64dd65e5027b78",
       "canonicalInvariant": true,
-      "rdFingerprintBefore": "45f3d372b31fa933211bc187b09c22c839f91b54570f9526e345be5b5e316c91",
-      "rdFingerprintAfter": "45f3d372b31fa933211bc187b09c22c839f91b54570f9526e345be5b5e316c91",
+      "rdFingerprintBefore": "76b97c2b028491fef1c41177aa6f2e42aa7e76f5d70629adc983da3b0d8a7ce4",
+      "rdFingerprintAfter": "76b97c2b028491fef1c41177aa6f2e42aa7e76f5d70629adc983da3b0d8a7ce4",
       "rdInvariant": true,
-      "rdChargeCountBefore": 107,
-      "rdChargeCountAfter": 107,
+      "rdChargeCountBefore": 104,
+      "rdChargeCountAfter": 104,
       "rdFeeTotalBefore": {
         "amountMinor": 295438,
         "currency": "USD"
@@ -7537,8 +7543,8 @@
         "amountMinor": 295438,
         "currency": "USD"
       },
-      "chargedCostProfileFingerprintBefore": "531d3de130afb1571c19f0c0514c28730ff2d94af639d57b5560c31558aefabf",
-      "chargedCostProfileFingerprintAfter": "531d3de130afb1571c19f0c0514c28730ff2d94af639d57b5560c31558aefabf",
+      "chargedCostProfileFingerprintBefore": "8f13cf3608916b5a6f1f0d299894e2a017dfa816ad93cb9dfdbfbfbc745a3cfc",
+      "chargedCostProfileFingerprintAfter": "8f13cf3608916b5a6f1f0d299894e2a017dfa816ad93cb9dfdbfbfbc745a3cfc",
       "inferredZeroFields": [],
       "admissionSafety": {
         "exactPopulationIdentityRequired": true,
