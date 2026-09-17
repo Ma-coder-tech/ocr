@@ -73,8 +73,6 @@ jobs:
     name: authority-containment
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    env:
-      FEECLEAR_DB_PATH: ${{ runner.temp }}/authority-containment.sqlite
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -83,6 +81,8 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Run authority, privacy, financial invariance, and provider containment tests
+        env:
+          FEECLEAR_DB_PATH: ${{ runner.temp }}/authority-containment.sqlite
         run: >-
           node scripts/run-node-tool.mjs ./node_modules/vitest/vitest.mjs run
           test/aiProviderAuthority.test.ts
@@ -101,8 +101,6 @@ jobs:
     name: corpus-gold-integrity
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    env:
-      FEECLEAR_DB_PATH: ${{ runner.temp }}/corpus-gold.sqlite
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -112,17 +110,23 @@ jobs:
       - run: npm ci
       - run: npm run corpus:test
       - run: npm run gold:validate
+        env:
+          FEECLEAR_DB_PATH: ${{ runner.temp }}/corpus-gold.sqlite
       - run: npm run gold:test
+        env:
+          FEECLEAR_DB_PATH: ${{ runner.temp }}/corpus-gold.sqlite
       - run: npm run gold:audit
+        env:
+          FEECLEAR_DB_PATH: ${{ runner.temp }}/corpus-gold.sqlite
       - run: npm run evaluation:integrity:dry-run
+        env:
+          FEECLEAR_DB_PATH: ${{ runner.temp }}/corpus-gold.sqlite
       - run: npm run repo:clean-check
 
   foundation-fiserv:
     name: foundation-fiserv
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    env:
-      FEECLEAR_DB_PATH: ${{ runner.temp }}/foundation-fiserv.sqlite
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -132,6 +136,8 @@ jobs:
       - run: npm ci
       - run: npm run validate:foundation
       - name: Run portable Fiserv regression coverage
+        env:
+          FEECLEAR_DB_PATH: ${{ runner.temp }}/foundation-fiserv.sqlite
         run: >-
           node scripts/run-node-tool.mjs ./node_modules/vitest/vitest.mjs run
           test/fiservFirstDataParser.test.ts
