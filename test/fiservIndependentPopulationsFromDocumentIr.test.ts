@@ -93,6 +93,16 @@ describe("independent supported-Fiserv populations from DocumentIR", () => {
       status: "not_mapped",
       limitations: [expect.stringMatching(/unambiguous card-summary header shape/i)],
     });
+
+    const outOfScope = structuredClone(ir("abdul"));
+    const allLines = outOfScope.pages.flatMap((page) => page.lines);
+    const heading = allLines.find((line) => /summary by card type/i.test(line.text))!;
+    const lastPage = outOfScope.pages.at(-1)!;
+    lastPage.lines.push({ ...heading, id: "pdfjs-line-999999", pageNumber: lastPage.pageNumber });
+    expect(extractFiservIndependentCardSummary(outOfScope)).toMatchObject({
+      status: "not_mapped",
+      limitations: [expect.stringMatching(/outside the bounded continued table/i)],
+    });
   });
 
   it("reconciles explicit adjustment rows and explicit no-chargeback sections", () => {

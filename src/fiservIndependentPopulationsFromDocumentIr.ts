@@ -111,6 +111,11 @@ export function extractFiservIndependentCardSummary(ir: DocumentIR): FiservIndep
   const headingIndex = headingIndexes[0]!;
   const endIndex = lines.findIndex((line, index) => index > headingIndex && /\bsummary by batch\b|\bamounts funded by batch\b/i.test(line.text));
   if (endIndex < 0) return emptyCardSummary("DocumentIR could not bound SUMMARY BY CARD TYPE with a following batch section.");
+  if (headingIndexes.some((index) => index >= endIndex)) {
+    return emptyCardSummary(
+      "DocumentIR contains a SUMMARY BY CARD TYPE heading outside the bounded continued table; the authority scope is ambiguous.",
+    );
+  }
   const section = lines.slice(headingIndex, endIndex);
   const headers = section.filter((line) => /^card type\s*\|/i.test(line.text.trim()));
   const totals = section.filter((line) => /^total\s*\|/i.test(line.text.trim()));
