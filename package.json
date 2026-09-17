@@ -15,7 +15,7 @@
     "build:all": "npm run build && npm run build:web",
     "typecheck:web": "tsc -p web/tsconfig.json",
     "start": "NODE_ENV=production node dist/server.js",
-    "test": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs ./node_modules/vitest/vitest.mjs run",
+    "test": "node scripts/check-toolchain.mjs && node scripts/run-test-baseline.mjs",
     "repo:clean-check": "node scripts/check-clean-checkout.mjs",
     "evaluation:five-statement-artifact:verify": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/verify-five-statement-live-artifact.ts",
     "parser:audit": "tsx scripts/parser-audit.ts",

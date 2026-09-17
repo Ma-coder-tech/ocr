@@ -3,7 +3,10 @@
 The supported repository test command is `npm test`. Vitest uses the `forks`
 pool with serial file execution because the suite repeatedly loads and closes
 native SQLite and PDF-parser state. Worker-thread execution is not a supported
-baseline path for these native-backed suites.
+baseline path for these native-backed suites. The high-volume Package 5B
+integration file runs in a second fresh Vitest process after the remaining
+repository suite. This keeps its native/PDF lifecycle and local liveness timers
+isolated without skipping tests or relaxing any assertion or timeout.
 
 The whole-statement work-plan tests use
 `test/fixtures/evaluation/five-statement-live-work-plan-observation-v1.json`.
