@@ -1,6 +1,8 @@
 import type { CanonicalEconomicCharge, CanonicalEconomicCostBucketKind, CanonicalEconomicsV2EconomicAnalysis } from "./economicTypes.js";
 import { RD_SEMANTIC_AMENDMENT_IDS } from "./economicVersionManifest.js";
 import { FISERV_FEE_LEDGER_OCCURRENCE_MARKER } from "./fiservAdapter.js";
+import { fiservClaimScopedFeeControlIdentityMatchesFoundationV1 } from "./fiservClaimScopedFeeOccurrenceAdmissionV1.js";
+import { fiservClaimScopedFeeRoundingControlMatchesFoundationV1 } from "./fiservClaimScopedFeeRoundingResidualV1.js";
 import { canonicalRoleProofRouteSatisfied } from "./economicProofRoutes.js";
 
 const EXPECTED_BUCKETS = [
@@ -358,6 +360,147 @@ function validateAdmission(
       errors.push("Complete capability-bound fee detail must reconcile to the authoritative statement fee total.");
     }
   }
+  if (profile.source === "claim_scoped_fee_occurrence") {
+    const foundation = analysis.pricingAnalysis.foundation;
+    const control = profile.claimScopedFeeControl;
+    const occurrenceById = new Map(foundation.sourceModel.occurrences.map((item) => [item.id, item]));
+    const contributing = analysis.economicLayer.charges.filter((charge) => charge.contributionStatus.startsWith("contributes_"));
+    if (!control || profile.feeDetailCoverage !== "complete" || !profile.statementPeriodApplicabilityProven) {
+      errors.push("Claim-scoped fee occurrence admission requires complete fee detail, exact control, and statement-period proof.");
+    } else {
+      const total = occurrenceById.get(control.authoritativeFeeTotalOccurrenceRef);
+      if (!fiservClaimScopedFeeControlIdentityMatchesFoundationV1(control, foundation)) {
+        errors.push("Claim-scoped fee occurrence admission is not bound to the RD source document, fingerprint, fee fact, and period.");
+      }
+      if (!total || total.evidenceRef !== control.authoritativeFeeTotalEvidenceRef ||
+          total.printedAmount?.amountMinor !== control.authoritativeFeeTotal.amountMinor ||
+          !profile.evidenceRefs.includes(control.authoritativeFeeTotalEvidenceRef)) {
+        errors.push("Claim-scoped authoritative fee total lacks exact source-occurrence evidence.");
+      }
+      const contributingRefs = contributing.map((charge) => charge.contributingOccurrenceRef).filter((ref): ref is string => Boolean(ref)).sort();
+      if (JSON.stringify(contributingRefs) !== JSON.stringify([...control.admittedOccurrenceRefs].sort())) {
+        errors.push("Claim-scoped contributing charges diverge from the admitted occurrence population.");
+      }
+      const normalizedFeeRefs = foundation.sourceModel.occurrences
+        .filter((occurrence) => occurrence.limitations.includes(FISERV_FEE_LEDGER_OCCURRENCE_MARKER))
+        .map((occurrence) => occurrence.id).sort();
+      const controlledRefs = [...control.admittedOccurrenceRefs, ...control.zeroDollarOccurrenceRefs].sort();
+      if (JSON.stringify(controlledRefs) !== JSON.stringify(normalizedFeeRefs)) {
+        errors.push("Claim-scoped control does not exhaust the normalized fee occurrence population.");
+      }
+      for (const ref of control.zeroDollarOccurrenceRefs) {
+        const occurrence = occurrenceById.get(ref);
+        if (!occurrence || occurrence.printedAmount?.amountMinor !== 0 || contributingRefs.includes(ref)) {
+          errors.push(`Claim-scoped zero-dollar occurrence ${ref} was not preserved as non-additive evidence.`);
+        }
+      }
+      for (const charge of contributing) {
+        const occurrence = occurrenceById.get(charge.contributingOccurrenceRef ?? "");
+        if (!occurrence || occurrence.semanticRole !== "fee_charge" || occurrence.contributionRole !== "supporting_detail" ||
+            !occurrence.limitations.includes(FISERV_FEE_LEDGER_OCCURRENCE_MARKER) ||
+            occurrence.printedAmount === null || occurrence.printedAmount.amountMinor <= 0 ||
+            !["positive", "unsigned"].includes(occurrence.printedDirection) ||
+            !charge.supportingDetailAdmissionEvidenceRefs.includes(occurrence.evidenceRef) ||
+            !profile.evidenceRefs.includes(occurrence.evidenceRef)) {
+          errors.push(`Claim-scoped charge ${charge.id} lacks exact positive fee-occurrence proof.`);
+        }
+      }
+      const sumMinor = contributing.reduce((sum, charge) => sum + (charge.observedAmount?.amountMinor ?? 0), 0);
+      if (sumMinor !== control.authoritativeFeeTotal.amountMinor ||
+          analysis.economicLayer.costStack.reconciliationDeltaMinor !== 0 ||
+          analysis.economicLayer.costStack.unresolvedRemainder !== null) {
+        errors.push("Claim-scoped fee occurrences do not reconcile exactly in integer minor units.");
+      }
+      if (!control.exactReconciliationControlId.trim()) errors.push("Claim-scoped exact reconciliation control identity is missing.");
+    }
+    if (analysis.economicLayer.dependencies.length > 0 || contributing.some((charge) =>
+      charge.pricingComponentRefs.length > 0 || charge.pricingPopulationRefs.length > 0 || charge.dependencyRefs.length > 0)) {
+      errors.push("Claim-scoped fee admission cannot create pricing or dependency semantics.");
+    }
+    if (contributing.some((charge) => charge.categoryResolution === "proven" &&
+      (charge.contributionStatus !== "contributes_classified" || charge.category === "unresolved_unclassified" ||
+        charge.semanticApplicationRefs.length !== 1))) {
+      errors.push("Claim-scoped category semantics require exactly one admitted canonical semantic application.");
+    }
+    if (contributing.some((charge) => charge.categoryResolution !== "proven" &&
+      (charge.contributionStatus !== "contributes_unresolved" || charge.category !== "unresolved_unclassified" ||
+        charge.semanticApplicationRefs.length > 0))) {
+      errors.push("Unresolved claim-scoped categories cannot carry semantic-application authority.");
+    }
+  }
+  if (profile.source === "claim_scoped_fee_rounding") {
+    const foundation = analysis.pricingAnalysis.foundation;
+    const control = profile.claimScopedFeeRoundingControl;
+    const occurrenceById = new Map(foundation.sourceModel.occurrences.map((item) => [item.id, item]));
+    const contributing = analysis.economicLayer.charges.filter((charge) => charge.contributionStatus.startsWith("contributes_"));
+    if (!control || profile.feeDetailCoverage !== "complete" || !profile.statementPeriodApplicabilityProven) {
+      errors.push("Claim-scoped bounded-rounding admission requires complete fee detail, a bound rounding control, and statement-period proof.");
+    } else {
+      const total = occurrenceById.get(control.authoritativeFeeTotalOccurrenceRef);
+      if (!fiservClaimScopedFeeRoundingControlMatchesFoundationV1(control, foundation)) {
+        errors.push("Claim-scoped bounded-rounding admission is not bound to its RD source, fingerprint, fee fact, and period.");
+      }
+      if (!total || total.evidenceRef !== control.authoritativeFeeTotalEvidenceRef ||
+          total.printedAmount?.amountMinor !== control.authoritativeFeeTotal.amountMinor ||
+          !profile.evidenceRefs.includes(control.authoritativeFeeTotalEvidenceRef)) {
+        errors.push("Claim-scoped bounded-rounding authoritative total lacks exact source evidence.");
+      }
+      const contributingRefs = contributing.map((charge) => charge.contributingOccurrenceRef).filter((ref): ref is string => Boolean(ref)).sort();
+      if (JSON.stringify(contributingRefs) !== JSON.stringify([...control.admittedOccurrenceRefs].sort())) {
+        errors.push("Claim-scoped bounded-rounding charges diverge from the admitted occurrence population.");
+      }
+      const normalizedFeeRefs = foundation.sourceModel.occurrences
+        .filter((occurrence) => occurrence.limitations.includes(FISERV_FEE_LEDGER_OCCURRENCE_MARKER))
+        .map((occurrence) => occurrence.id).sort();
+      if (JSON.stringify([...control.admittedOccurrenceRefs, ...control.zeroDollarOccurrenceRefs].sort()) !== JSON.stringify(normalizedFeeRefs)) {
+        errors.push("Claim-scoped bounded-rounding control does not exhaust the normalized fee population.");
+      }
+      for (const ref of control.zeroDollarOccurrenceRefs) {
+        const occurrence = occurrenceById.get(ref);
+        if (!occurrence || occurrence.printedAmount?.amountMinor !== 0 || contributingRefs.includes(ref)) {
+          errors.push(`Claim-scoped bounded-rounding zero-dollar occurrence ${ref} was not preserved as non-additive evidence.`);
+        }
+      }
+      for (const charge of contributing) {
+        const occurrence = occurrenceById.get(charge.contributingOccurrenceRef ?? "");
+        if (!occurrence || occurrence.semanticRole !== "fee_charge" || occurrence.contributionRole !== "supporting_detail" ||
+            !occurrence.limitations.includes(FISERV_FEE_LEDGER_OCCURRENCE_MARKER) || occurrence.printedAmount === null ||
+            occurrence.printedAmount.amountMinor <= 0 || !["positive", "unsigned"].includes(occurrence.printedDirection) ||
+            !charge.supportingDetailAdmissionEvidenceRefs.includes(occurrence.evidenceRef) || !profile.evidenceRefs.includes(occurrence.evidenceRef)) {
+          errors.push(`Claim-scoped bounded-rounding charge ${charge.id} lacks exact positive fee-occurrence proof.`);
+        }
+      }
+      const sumMinor = contributing.reduce((sum, charge) => sum + (charge.observedAmount?.amountMinor ?? 0), 0);
+      const residual = control.authoritativeFeeTotal.amountMinor - sumMinor;
+      const metadata = analysis.economicLayer.costStack.roundingResidual;
+      if (sumMinor !== control.admittedFeeOccurrenceSumMinor || residual !== control.signedResidualMinor ||
+          Math.abs(residual) !== control.absoluteResidualMinor || control.absoluteResidualMinor < 1 ||
+          control.absoluteResidualMinor > 2 || control.maximumAcceptedAbsoluteResidualMinor !== 2 ||
+          analysis.economicLayer.costStack.reconciliationDeltaMinor !== residual ||
+          analysis.economicLayer.costStack.unresolvedRemainder !== null ||
+          !metadata || metadata.signedResidualMinor !== residual || metadata.additiveChargeRef !== null ||
+          metadata.category !== null || metadata.participantOrOwner !== null) {
+        errors.push("Claim-scoped bounded-rounding fee occurrences do not satisfy the non-additive two-minor-unit reconciliation contract.");
+      }
+      if (!control.reconciliationControlId.trim() || control.reconciliationControlResult !== "pass_with_rounding") {
+        errors.push("Claim-scoped bounded-rounding control identity/result is missing.");
+      }
+    }
+    if (analysis.economicLayer.dependencies.length > 0 || contributing.some((charge) =>
+      charge.pricingComponentRefs.length > 0 || charge.pricingPopulationRefs.length > 0 || charge.dependencyRefs.length > 0)) {
+      errors.push("Claim-scoped bounded-rounding admission cannot create pricing or dependency semantics.");
+    }
+    if (contributing.some((charge) => charge.categoryResolution === "proven" &&
+      (charge.contributionStatus !== "contributes_classified" || charge.category === "unresolved_unclassified" ||
+        charge.semanticApplicationRefs.length !== 1))) {
+      errors.push("Claim-scoped bounded-rounding category semantics require exactly one admitted canonical semantic application.");
+    }
+    if (contributing.some((charge) => charge.categoryResolution !== "proven" &&
+      (charge.contributionStatus !== "contributes_unresolved" || charge.category !== "unresolved_unclassified" ||
+        charge.semanticApplicationRefs.length > 0))) {
+      errors.push("Unresolved bounded-rounding categories cannot carry semantic-application authority.");
+    }
+  }
   if (profile.source === "observational") {
     if (profile.feeDetailCoverage === "complete" || profile.feeDetailCoverage === "incomplete" || profile.statementPeriodApplicabilityProven) {
       errors.push("Observational RD admission cannot prove fee-detail coverage or statement-period applicability.");
@@ -368,7 +511,8 @@ function validateAdmission(
     if (analysis.economicLayer.roleClaims.some((claim) => claim.resolution === "proven")) errors.push("Observational RD admission cannot prove participant/control roles.");
     warnings.push("RD observations remain non-authoritative pending source/template admission.");
   }
-  if (analysis.economicLayer.semanticApplications.length > 0 && profile.source !== "runtime_capability") {
+  if (analysis.economicLayer.semanticApplications.length > 0 &&
+      !["runtime_capability", "claim_scoped_fee_occurrence", "claim_scoped_fee_rounding"].includes(profile.source)) {
     errors.push("Canonical semantic applications are authorized only for the capability-bound production ledger.");
   }
   const unavailable = analysis.pricingAnalysis.foundation.identity.provenanceStatus === "source_unavailable" ||
@@ -478,7 +622,8 @@ function validateCostStack(analysis: CanonicalEconomicsV2EconomicAnalysis, error
   if (bucketNet !== expectedChargeNet + remainder) errors.push("RD cost buckets do not reconstruct from charges and unresolved remainder.");
   if (stack.statementFeeFactRef !== feeFact.id) errors.push("RD cost stack references the wrong RB fee fact.");
   if (feeFact.status === "available" && stack.authoritativeStatementFeeTotal?.amountMinor !== feeFact.value?.amountMinor) errors.push("RD authoritative fee total diverges from RB.");
-  if (feeFact.status !== "available" && stack.completeness !== "not_derivable_from_document") errors.push("Unavailable RB fee total must make RD cost stack not derivable.");
+  if (feeFact.status !== "available" && !["claim_scoped_fee_occurrence", "claim_scoped_fee_rounding"].includes(analysis.economicLayer.admissionProfile.source) &&
+      stack.completeness !== "not_derivable_from_document") errors.push("Unavailable RB fee total must make RD cost stack not derivable.");
   if (stack.completeness === "complete" && (stack.reconciliationDeltaMinor !== 0 || stack.unresolvedRemainder !== null || stack.buckets.find((bucket) => bucket.kind === "unresolved_cost")!.netAmount.amountMinor !== 0)) {
     errors.push("Complete RD cost stack cannot contain delta, remainder, or unresolved cost.");
   }
@@ -488,10 +633,22 @@ function validateCostStack(analysis: CanonicalEconomicsV2EconomicAnalysis, error
       .filter((charge) => charge.contributionStatus.startsWith("contributes_"))
       .map((charge) => charge.contributingOccurrenceRef)
       .filter((ref): ref is string => Boolean(ref));
-    if (!control || control.status !== "pass_with_rounding" || stack.reconciliationDeltaMinor === 0 ||
-      !control.factRefs.includes(feeFact.id) || !contributingOccurrenceRefs.every((ref) => control.occurrenceRefs.includes(ref))) {
+    const claimScoped = analysis.economicLayer.admissionProfile.source === "claim_scoped_fee_rounding"
+      ? analysis.economicLayer.admissionProfile.claimScopedFeeRoundingControl ?? null : null;
+    const claimScopedValid = Boolean(claimScoped && stack.roundingResidual && stack.reconciliationDeltaMinor === claimScoped.signedResidualMinor &&
+      claimScoped.absoluteResidualMinor >= 1 && claimScoped.absoluteResidualMinor <= 2 &&
+      stack.roundingResidual.additiveChargeRef === null && stack.roundingResidual.category === null &&
+      stack.roundingResidual.participantOrOwner === null);
+    if (!claimScopedValid && (!control || control.status !== "pass_with_rounding" || stack.reconciliationDeltaMinor === 0 ||
+      !control.factRefs.includes(feeFact.id) || !contributingOccurrenceRefs.every((ref) => control.occurrenceRefs.includes(ref)))) {
       errors.push("Complete-with-rounding requires a fee-bound RB rounding control covering the authoritative fee fact and contributing fee occurrences.");
     }
+  }
+  if (analysis.economicLayer.admissionProfile.source === "claim_scoped_fee_rounding" && !stack.roundingResidual) {
+    errors.push("Claim-scoped bounded-rounding RD requires explicit non-additive rounding metadata.");
+  }
+  if (analysis.economicLayer.admissionProfile.source !== "claim_scoped_fee_rounding" && stack.roundingResidual) {
+    errors.push("Non-additive claim-scoped rounding metadata cannot appear outside its admission source.");
   }
   if (stack.completeness === "partial_but_financially_reconciled" && stack.totalStatementProcessingCost === null) errors.push("Partial-but-reconciled stack must retain the authoritative statement cost.");
   if (stack.completeness === "financially_unreconciled" && stack.totalStatementProcessingCost !== null) errors.push("Financially unreconciled stack cannot assert total statement processing cost.");

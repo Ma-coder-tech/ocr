@@ -20,6 +20,7 @@ const fixtures = {
   vortax: "fiserv_NXGEN_VORTAX_Sep_2022.pdf",
   zero: "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Sep_2025_zero_volume.pdf",
   priority: "fiserv_PRIORITY_PAYMENT_SYSTEMS_Dec_2024.pdf",
+  abdul: "fiserv_ABDUL_BASHER_Aug_2025.pdf",
 } as const;
 const documents = new Map<keyof typeof fixtures, ParsedDocument>();
 
@@ -66,6 +67,41 @@ describe("independent supported-Fiserv populations from DocumentIR", () => {
       submittedVolume: { value: 120_000 },
       formulaDeltaMinor: 120_000,
       formulaStatus: "fail",
+    });
+  });
+
+  it("accepts a continued card summary only when repeated headings and headers are structurally identical", () => {
+    expect(extractFiservIndependentCardSummary(ir("abdul"))).toMatchObject({
+      status: "mapped",
+      grossVolume: { value: 271_211 },
+      refundVolume: { value: 0 },
+      submittedVolume: { value: 271_211 },
+      grossCount: { value: 64 },
+      refundCount: { value: 0 },
+      submittedCount: null,
+      formulaStatus: "pass",
+      limitations: expect.arrayContaining([
+        expect.stringMatching(/repeated identical summary by card type headings/i),
+      ]),
+    });
+
+    const ambiguous = structuredClone(ir("abdul"));
+    const headings = ambiguous.pages.flatMap((page) => page.lines)
+      .filter((line) => /summary by card type/i.test(line.text));
+    headings[1]!.text = "SUMMARY BY CARD TYPE — DIFFERENT SCOPE";
+    expect(extractFiservIndependentCardSummary(ambiguous)).toMatchObject({
+      status: "not_mapped",
+      limitations: [expect.stringMatching(/unambiguous card-summary header shape/i)],
+    });
+
+    const outOfScope = structuredClone(ir("abdul"));
+    const allLines = outOfScope.pages.flatMap((page) => page.lines);
+    const heading = allLines.find((line) => /summary by card type/i.test(line.text))!;
+    const lastPage = outOfScope.pages.at(-1)!;
+    lastPage.lines.push({ ...heading, id: "pdfjs-line-999999", pageNumber: lastPage.pageNumber });
+    expect(extractFiservIndependentCardSummary(outOfScope)).toMatchObject({
+      status: "not_mapped",
+      limitations: [expect.stringMatching(/outside the bounded continued table/i)],
     });
   });
 
