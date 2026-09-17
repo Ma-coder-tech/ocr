@@ -699,7 +699,7 @@ function bucketRows(rows: FiservFeeAnalysisRow[], totalFees: number): FiservFeeA
     .filter((bucket) => bucket.rows > 0);
 }
 
-function isProcessorSpreadMarkupDescription(description: string): boolean {
+function isMerchantFacingCommercialPricingDescription(description: string): boolean {
   const normalized = normalizeFiservFeeReferenceText(description);
   return /^DISC\s+\d+$/.test(normalized) || normalized === "QUAL DISC" || /\bSALES DISCOUNT\b/.test(normalized) || normalized === "OTHER VOLUME FEES";
 }
@@ -711,7 +711,7 @@ function detectIcPlusFromCanonicalRows(
   const nonZeroRows = rows.filter((row) => row.amount > 0);
   const interchangeRows = nonZeroRows.filter((row) => row.feeType === "interchange");
   const networkRows = nonZeroRows.filter((row) => row.feeType === "card_brand_network" || row.feeType === "pin_debit_network");
-  const processorSpreadRows = nonZeroRows.filter((row) => isProcessorSpreadMarkupDescription(row.originalDescription) && row.rate !== null);
+  const processorSpreadRows = nonZeroRows.filter((row) => isMerchantFacingCommercialPricingDescription(row.originalDescription) && row.rate !== null);
   const uniqueProcessorSpreadRates = new Set(processorSpreadRows.map((row) => row.rate?.toFixed(7)));
   const mqualOrNqualRows = nonZeroRows.filter((row) => /\b(?:MQUAL|NQUAL|MID QUAL|NON QUAL)\b/i.test(row.originalDescription));
 
@@ -723,7 +723,7 @@ function detectIcPlusFromCanonicalRows(
       evidence: [
         "Separate interchange rows are visible.",
         "Card-brand/network rows are itemized separately.",
-        `Processor spread markup is uniform at ${processorSpreadRows[0]?.rate ?? "unknown"} across visible card sections.`,
+        `Merchant-facing acquiring-side commercial pricing is uniform at ${processorSpreadRows[0]?.rate ?? "unknown"} across visible card sections; this does not establish ultimate retention.`,
       ],
     };
   }
@@ -737,7 +737,7 @@ function detectIcPlusFromCanonicalRows(
   const uniqueQualRates = new Set(qualRows.map((row) => row.rate?.toFixed(7)));
   const zeroDiscountRows = rows.filter((row) => /^DISC\s+\d+$/i.test(row.originalDescription.trim()) && row.amount === 0);
   if (
-    inherited.pricingModel === "flat_discount_pricing" &&
+    (inherited.pricingModel === "flat_discount_pricing" || inherited.pricingModel === "flat_rate") &&
     interchangeRows.length === 0 &&
     networkRows.length === 0 &&
     qualRows.length >= 2 &&
@@ -745,16 +745,16 @@ function detectIcPlusFromCanonicalRows(
     uniqueQualRates.size === 1
   ) {
     return {
-      pricingModel: zeroDiscountRows.length > 0 ? "single_tier_qualified" : "flat_rate_bundled",
+      pricingModel: "flat_rate",
       confidence: "high",
       analysisStatus: "universal_only_pending_model_rules",
       evidence: [
-        `Only QUAL DISC discount rows are charged, all at ${(qualRows[0]?.rate ?? 0) * 100}% of volume.`,
-        "No charged MQUAL/NQUAL rows are visible, so this is not a full multi-tier statement from the visible fee rows.",
+        `Only QUAL DISC pricing-population rows are charged, all at ${(qualRows[0]?.rate ?? 0) * 100}% of volume.`,
+        "No charged MQUAL/NQUAL rows are visible and no separately itemized interchange is present, so the visible structure is a uniform flat bundled merchant price rather than a tier conclusion from the QUAL label.",
         ...(zeroDiscountRows.length > 0
           ? [`${zeroDiscountRows.length} zero-amount DISC tier row(s) are visible, suggesting unused tier infrastructure.`]
           : []),
-        "Interchange and network fees are bundled into the discount charge, so V2 uses benchmark estimates instead of pass-through proof.",
+        "Interchange and network fees are bundled into the merchant-facing price; the statement does not establish processor/acquirer/ISO retention, so V2 does not treat the rate as processor profit.",
       ],
     };
   }

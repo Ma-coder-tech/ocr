@@ -1,0 +1,978 @@
+{
+  "schemaVersion": "unknown_fee_research_calibration_live_evaluation_v1",
+  "evaluationOnly": true,
+  "executionProfile": {
+    "model": "gpt-5.6-sol",
+    "liveResearchCases": 4,
+    "stage0ControlCases": 1,
+    "maximumSearchShapes": 4,
+    "maximumDocumentFetches": 3,
+    "maximumSynthesisCalls": 1,
+    "maximumExternalOperationsPerFee": 8,
+    "maximumCandidatesPerSearch": 2,
+    "automaticRetries": 0,
+    "fallbackProvidersAllowed": false,
+    "store": false,
+    "sentFields": [
+      "processor_name",
+      "statement_year",
+      "statement_role",
+      "sanitized_fee_label",
+      "amount_free_query_hypothesis_or_mechanic",
+      "document_genre",
+      "retrieved_public_source_excerpt"
+    ],
+    "prohibitedFieldsSent": false
+  },
+  "cases": [
+    {
+      "caseId": "monthly_advantage",
+      "execution": "LIVE_RESEARCH",
+      "file": "Nov_2024_Statement.pdf",
+      "printedLabel": "Other - MONTHLY ADVANTAGE FEE MCVDB 0.0003 TIMES $47996.83",
+      "primaryType": "A_PROPRIETARY_BRANDED",
+      "applicableTypes": [
+        "A_PROPRIETARY_BRANDED",
+        "C_ABBREVIATED_CODED",
+        "F_UNFAMILIAR_PER_ITEM_OR_RECURRING"
+      ],
+      "stage0": {
+        "decision": "RESEARCH",
+        "determinantSufficient": false,
+        "exactIdentityMateriallyChangesConclusion": true,
+        "unresolvedMaterialDeterminant": true,
+        "reasonCodes": [
+          "identity_or_interpretation_materially_changes_conclusion",
+          "research_type_a_proprietary_branded",
+          "research_type_c_abbreviated_coded",
+          "research_type_f_unfamiliar_per_item_or_recurring"
+        ],
+        "stoppingReason": null
+      },
+      "budget": {
+        "maximumSearchShapes": 4,
+        "maximumDocumentFetches": 3,
+        "maximumSynthesisCalls": 1,
+        "maximumExternalOperations": 8,
+        "minimumDistinctNoEvidenceShapesBeforeStop": 2,
+        "exceptionalEscalationAllowed": false
+      },
+      "queryShapes": [
+        {
+          "shapeId": "shape_01_exact_quoted_label",
+          "kind": "EXACT_QUOTED_LABEL",
+          "documentGenres": [
+            "exact_document"
+          ]
+        },
+        {
+          "shapeId": "shape_02_processor_exact_label",
+          "kind": "PROCESSOR_EXACT_LABEL",
+          "documentGenres": [
+            "processor_documentation"
+          ]
+        },
+        {
+          "shapeId": "shape_03_code_processor_document_genre",
+          "kind": "CODE_PROCESSOR_DOCUMENT_GENRE",
+          "documentGenres": [
+            "fee_schedule",
+            "merchant_application",
+            "statement_guide"
+          ]
+        },
+        {
+          "shapeId": "shape_04_same_platform_public_statement",
+          "kind": "SAME_PLATFORM_PUBLIC_STATEMENT",
+          "documentGenres": [
+            "same_platform_public_statement"
+          ]
+        }
+      ],
+      "operations": [
+        {
+          "ordinal": 1,
+          "type": "search",
+          "shapeKind": "EXACT_QUOTED_LABEL",
+          "status": "completed",
+          "reasonCodes": [
+            "search_candidates_discovered"
+          ]
+        },
+        {
+          "ordinal": 2,
+          "type": "search",
+          "shapeKind": "PROCESSOR_EXACT_LABEL",
+          "status": "completed",
+          "reasonCodes": [
+            "search_candidates_discovered"
+          ]
+        },
+        {
+          "ordinal": 3,
+          "type": "search",
+          "shapeKind": "CODE_PROCESSOR_DOCUMENT_GENRE",
+          "status": "completed",
+          "reasonCodes": [
+            "search_candidates_discovered"
+          ]
+        },
+        {
+          "ordinal": 4,
+          "type": "search",
+          "shapeKind": "SAME_PLATFORM_PUBLIC_STATEMENT",
+          "status": "completed",
+          "reasonCodes": [
+            "search_candidates_discovered"
+          ]
+        },
+        {
+          "ordinal": 5,
+          "type": "document_fetch",
+          "shapeKind": null,
+          "status": "completed",
+          "reasonCodes": [
+            "fee_knowledge_text_retrieved"
+          ]
+        },
+        {
+          "ordinal": 6,
+          "type": "document_fetch",
+          "shapeKind": null,
+          "status": "completed",
+          "reasonCodes": [
+            "fee_knowledge_text_retrieved"
+          ]
+        },
+        {
+          "ordinal": 7,
+          "type": "document_fetch",
+          "shapeKind": null,
+          "status": "completed",
+          "reasonCodes": [
+            "fee_knowledge_text_retrieved"
+          ]
+        }
+      ],
+      "queryShapeResults": [
+        {
+          "shapeId": "shape_01_exact_quoted_label",
+          "kind": "EXACT_QUOTED_LABEL",
+          "candidateCount": 2,
+          "usefulCandidateCount": 0,
+          "reasonCodes": [
+            "candidate_utility_pending_retrieval"
+          ]
+        },
+        {
+          "shapeId": "shape_02_processor_exact_label",
+          "kind": "PROCESSOR_EXACT_LABEL",
+          "candidateCount": 2,
+          "usefulCandidateCount": 0,
+          "reasonCodes": [
+            "candidate_utility_pending_retrieval"
+          ]
+        },
+        {
+          "shapeId": "shape_03_code_processor_document_genre",
+          "kind": "CODE_PROCESSOR_DOCUMENT_GENRE",
+          "candidateCount": 2,
+          "usefulCandidateCount": 0,
+          "reasonCodes": [
+            "candidate_utility_pending_retrieval"
+          ]
+        },
+        {
+          "shapeId": "shape_04_same_platform_public_statement",
+          "kind": "SAME_PLATFORM_PUBLIC_STATEMENT",
+          "candidateCount": 2,
+          "usefulCandidateCount": 0,
+          "reasonCodes": [
+            "candidate_utility_pending_retrieval"
+          ]
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://www.clover.com/pricing",
+          "title": null,
+          "publisher": null,
+          "lane": "processor_own",
+          "discoveredByShapeIds": [
+            "shape_03_code_processor_document_genre"
+          ],
+          "retrievalStatus": "retrieved_text",
+          "searchUseful": true,
+          "evidenceUseful": false,
+          "authorityState": "candidate_not_admitted",
+          "reasonCodes": [
+            "retrieved_text_not_specific_enough"
+          ]
+        },
+        {
+          "url": "https://www.cloverhealth.com/providers/resources",
+          "title": null,
+          "publisher": null,
+          "lane": "generic_or_ai_navigation",
+          "discoveredByShapeIds": [
+            "shape_03_code_processor_document_genre"
+          ],
+          "retrievalStatus": "retrieved_text",
+          "searchUseful": true,
+          "evidenceUseful": false,
+          "authorityState": "candidate_not_admitted",
+          "reasonCodes": [
+            "retrieved_text_not_specific_enough"
+          ]
+        },
+        {
+          "url": "https://www.scribd.com/document/751404454/Clover-June-Processing-Report",
+          "title": null,
+          "publisher": null,
+          "lane": "same_platform_statement",
+          "discoveredByShapeIds": [
+            "shape_04_same_platform_public_statement"
+          ],
+          "retrievalStatus": "retrieved_text",
+          "searchUseful": true,
+          "evidenceUseful": false,
+          "authorityState": "candidate_not_admitted",
+          "reasonCodes": [
+            "retrieved_text_not_specific_enough"
+          ]
+        }
+      ],
+      "provisionalSynthesis": null,
+      "governedD1D4Changed": false,
+      "governedConfidenceChanged": false,
+      "canonicalFingerprintUnchanged": true,
+      "stoppingDecision": {
+        "stop": true,
+        "stoppingReason": "S4_SOURCE_QUALITY_FAILURE",
+        "reasonCodes": [
+          "retrieved_evidence_low_quality_duplicative_or_inapplicable"
+        ]
+      }
+    },
+    {
+      "caseId": "batch_settlement",
+      "execution": "LIVE_RESEARCH",
+      "file": "Nov_2024_Statement.pdf",
+      "printedLabel": "Other - BATCH SETTLEMENT FEE 56 TRANSACTIONS AT 0.15",
+      "primaryType": "F_UNFAMILIAR_PER_ITEM_OR_RECURRING",
+      "applicableTypes": [
+        "F_UNFAMILIAR_PER_ITEM_OR_RECURRING"
+      ],
+      "stage0": {
+        "decision": "RESEARCH",
+        "determinantSufficient": false,
+        "exactIdentityMateriallyChangesConclusion": true,
+        "unresolvedMaterialDeterminant": true,
+        "reasonCodes": [
+          "identity_or_interpretation_materially_changes_conclusion",
+          "research_type_f_unfamiliar_per_item_or_recurring"
+        ],
+        "stoppingReason": null
+      },
+      "budget": {
+        "maximumSearchShapes": 3,
+        "maximumDocumentFetches": 3,
+        "maximumSynthesisCalls": 1,
+        "maximumExternalOperations": 7,
+        "minimumDistinctNoEvidenceShapesBeforeStop": 2,
+        "exceptionalEscalationAllowed": false
+      },
+      "queryShapes": [
+        {
+          "shapeId": "shape_01_exact_quoted_label",
+          "kind": "EXACT_QUOTED_LABEL",
+          "documentGenres": [
+            "exact_document"
+          ]
+        },
+        {
+          "shapeId": "shape_02_mechanic_population_hypothesis",
+          "kind": "MECHANIC_POPULATION_HYPOTHESIS",
+          "documentGenres": [
+            "fee_schedule",
+            "statement_guide"
+          ]
+        },
+        {
+          "shapeId": "shape_03_processor_fee_schedule",
+          "kind": "PROCESSOR_FEE_SCHEDULE",
+          "documentGenres": [
+            "pricing_schedule",
+            "pass_through_fee_schedule"
+          ]
+        }
+      ],
+      "operations": [
+        {
+          "ordinal": 1,
+          "type": "search",
+          "shapeKind": "EXACT_QUOTED_LABEL",
+          "status": "completed",
+          "reasonCodes": [
+            "search_candidates_discovered"
+          ]
+        },
+        {
+          "ordinal": 2,
+          "type": "search",
+          "shapeKind": "MECHANIC_POPULATION_HYPOTHESIS",
+          "status": "completed",
+          "reasonCodes": [
+            "search_candidates_discovered"
+          ]
+        },
+        {
+          "ordinal": 3,
+          "type": "search",
+          "shapeKind": "PROCESSOR_FEE_SCHEDULE",
+          "status": "completed",
+          "reasonCodes": [
+            "search_candidates_discovered"
+          ]
+        },
+        {
+          "ordinal": 4,
+          "type": "document_fetch",
+          "shapeKind": null,
+          "status": "completed",
+          "reasonCodes": [
+            "fee_knowledge_http_406"
+          ]
+        },
+        {
+          "ordinal": 5,
+          "type": "document_fetch",
+          "shapeKind": null,
+          "status": "completed",
+          "reasonCodes": [
+            "fee_knowledge_text_retrieved"
+          ]
+        },
+        {
+          "ordinal": 6,
+          "type": "document_fetch",
+          "shapeKind": null,
+          "status": "completed",
+          "reasonCodes": [
+            "fee_knowledge_text_retrieved"
+          ]
+        }
+      ],
+      "queryShapeResults": [
+        {
+          "shapeId": "shape_01_exact_quoted_label",
+          "kind": "EXACT_QUOTED_LABEL",
+          "candidateCount": 2,
+          "usefulCandidateCount": 0,
+          "reasonCodes": [
+            "candidate_utility_pending_retrieval"
+          ]
+        },
+        {
+          "shapeId": "shape_02_mechanic_population_hypothesis",
+          "kind": "MECHANIC_POPULATION_HYPOTHESIS",
+          "candidateCount": 2,
+          "usefulCandidateCount": 0,
+          "reasonCodes": [
+            "candidate_utility_pending_retrieval"
+          ]
+        },
+        {
+          "shapeId": "shape_03_processor_fee_schedule",
+          "kind": "PROCESSOR_FEE_SCHEDULE",
+          "candidateCount": 2,
+          "usefulCandidateCount": 0,
+          "reasonCodes": [
+            "candidate_utility_pending_retrieval"
+          ]
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://uk.clover.com/legal/fee-schedule/",
+          "title": null,
+          "publisher": null,
+          "lane": "processor_own",
+          "discoveredByShapeIds": [
+            "shape_03_processor_fee_schedule"
+          ],
+          "retrievalStatus": "unavailable",
+          "searchUseful": false,
+          "evidenceUseful": false,
+          "authorityState": "candidate_not_admitted",
+          "reasonCodes": [
+            "fee_knowledge_http_406"
+          ]
+        },
+        {
+          "url": "https://www.clover.com/pricing",
+          "title": null,
+          "publisher": null,
+          "lane": "processor_own",
+          "discoveredByShapeIds": [
+            "shape_03_processor_fee_schedule"
+          ],
+          "retrievalStatus": "retrieved_text",
+          "searchUseful": true,
+          "evidenceUseful": false,
+          "authorityState": "candidate_not_admitted",
+          "reasonCodes": [
+            "retrieved_text_not_specific_enough"
+          ]
+        },
+        {
+          "url": "https://www.cloverhealth.com/providers/resources",
+          "title": null,
+          "publisher": null,
+          "lane": "generic_or_ai_navigation",
+          "discoveredByShapeIds": [
+            "shape_02_mechanic_population_hypothesis"
+          ],
+          "retrievalStatus": "retrieved_text",
+          "searchUseful": true,
+          "evidenceUseful": false,
+          "authorityState": "candidate_not_admitted",
+          "reasonCodes": [
+            "retrieved_text_not_specific_enough"
+          ]
+        }
+      ],
+      "provisionalSynthesis": null,
+      "governedD1D4Changed": false,
+      "governedConfidenceChanged": false,
+      "canonicalFingerprintUnchanged": true,
+      "stoppingDecision": {
+        "stop": true,
+        "stoppingReason": "S4_SOURCE_QUALITY_FAILURE",
+        "reasonCodes": [
+          "retrieved_evidence_low_quality_duplicative_or_inapplicable"
+        ]
+      }
+    },
+    {
+      "caseId": "application_fee_generic",
+      "execution": "LIVE_RESEARCH",
+      "file": "SAMPLE_MERCHANT_3-Clover-June-Processing-Report.pdf",
+      "printedLabel": "APPLICATION FEE",
+      "primaryType": "B_GENERIC_DESCRIPTIVE",
+      "applicableTypes": [
+        "B_GENERIC_DESCRIPTIVE"
+      ],
+      "stage0": {
+        "decision": "RESEARCH",
+        "determinantSufficient": false,
+        "exactIdentityMateriallyChangesConclusion": true,
+        "unresolvedMaterialDeterminant": true,
+        "reasonCodes": [
+          "identity_or_interpretation_materially_changes_conclusion",
+          "research_type_b_generic_descriptive"
+        ],
+        "stoppingReason": null
+      },
+      "budget": {
+        "maximumSearchShapes": 3,
+        "maximumDocumentFetches": 2,
+        "maximumSynthesisCalls": 1,
+        "maximumExternalOperations": 6,
+        "minimumDistinctNoEvidenceShapesBeforeStop": 2,
+        "exceptionalEscalationAllowed": false
+      },
+      "queryShapes": [
+        {
+          "shapeId": "shape_01_mechanic_population_hypothesis",
+          "kind": "MECHANIC_POPULATION_HYPOTHESIS",
+          "documentGenres": [
+            "fee_schedule",
+            "statement_guide"
+          ]
+        },
+        {
+          "shapeId": "shape_02_processor_fee_schedule",
+          "kind": "PROCESSOR_FEE_SCHEDULE",
+          "documentGenres": [
+            "pricing_schedule",
+            "pass_through_fee_schedule"
+          ]
+        }
+      ],
+      "operations": [
+        {
+          "ordinal": 1,
+          "type": "search",
+          "shapeKind": "MECHANIC_POPULATION_HYPOTHESIS",
+          "status": "completed",
+          "reasonCodes": [
+            "search_candidates_discovered"
+          ]
+        },
+        {
+          "ordinal": 2,
+          "type": "search",
+          "shapeKind": "PROCESSOR_FEE_SCHEDULE",
+          "status": "completed",
+          "reasonCodes": [
+            "search_candidates_discovered"
+          ]
+        },
+        {
+          "ordinal": 3,
+          "type": "document_fetch",
+          "shapeKind": null,
+          "status": "completed",
+          "reasonCodes": [
+            "fee_knowledge_pdf_text_retrieved"
+          ]
+        },
+        {
+          "ordinal": 4,
+          "type": "document_fetch",
+          "shapeKind": null,
+          "status": "completed",
+          "reasonCodes": [
+            "fee_knowledge_pdf_text_retrieved"
+          ]
+        },
+        {
+          "ordinal": 5,
+          "type": "candidate_synthesis",
+          "shapeKind": null,
+          "status": "completed",
+          "reasonCodes": [
+            "candidate_interpretations_generated_not_admitted"
+          ]
+        }
+      ],
+      "queryShapeResults": [
+        {
+          "shapeId": "shape_01_mechanic_population_hypothesis",
+          "kind": "MECHANIC_POPULATION_HYPOTHESIS",
+          "candidateCount": 2,
+          "usefulCandidateCount": 2,
+          "reasonCodes": [
+            "candidate_utility_pending_retrieval"
+          ]
+        },
+        {
+          "shapeId": "shape_02_processor_fee_schedule",
+          "kind": "PROCESSOR_FEE_SCHEDULE",
+          "candidateCount": 2,
+          "usefulCandidateCount": 0,
+          "reasonCodes": [
+            "candidate_utility_pending_retrieval"
+          ]
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://merchants.fiserv.com/content/dam/firstdata/au/en/documents/FDMSA_Merchant_Agreement_General_Terms_PDF.pdf",
+          "title": null,
+          "publisher": null,
+          "lane": "processor_own",
+          "discoveredByShapeIds": [
+            "shape_01_mechanic_population_hypothesis"
+          ],
+          "retrievalStatus": "retrieved_text",
+          "searchUseful": true,
+          "evidenceUseful": true,
+          "authorityState": "candidate_not_admitted",
+          "reasonCodes": [
+            "retrieved_text_applies_to_fee_candidate"
+          ]
+        },
+        {
+          "url": "https://merchants.fiserv.com/content/dam/firstdata/in/en/documents/schedule_of_charges_soc.pdf",
+          "title": null,
+          "publisher": null,
+          "lane": "processor_own",
+          "discoveredByShapeIds": [
+            "shape_01_mechanic_population_hypothesis"
+          ],
+          "retrievalStatus": "retrieved_text",
+          "searchUseful": true,
+          "evidenceUseful": true,
+          "authorityState": "candidate_not_admitted",
+          "reasonCodes": [
+            "retrieved_text_applies_to_fee_candidate"
+          ]
+        }
+      ],
+      "provisionalSynthesis": {
+        "candidateInterpretations": [],
+        "determinantLift": [],
+        "actionLift": false,
+        "evidenceTierImproved": false
+      },
+      "governedD1D4Changed": false,
+      "governedConfidenceChanged": false,
+      "canonicalFingerprintUnchanged": true,
+      "stoppingDecision": {
+        "stop": true,
+        "stoppingReason": "S3_RESEARCH_STAGNATION",
+        "reasonCodes": [
+          "further_research_did_not_improve_evidence_or_confidence_tier"
+        ]
+      }
+    },
+    {
+      "caseId": "amexct043_nqual_coded",
+      "execution": "LIVE_RESEARCH",
+      "file": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf",
+      "printedLabel": "AMEXCT043 - NQUAL DISC",
+      "primaryType": "C_ABBREVIATED_CODED",
+      "applicableTypes": [
+        "C_ABBREVIATED_CODED"
+      ],
+      "stage0": {
+        "decision": "RESEARCH",
+        "determinantSufficient": false,
+        "exactIdentityMateriallyChangesConclusion": true,
+        "unresolvedMaterialDeterminant": true,
+        "reasonCodes": [
+          "identity_or_interpretation_materially_changes_conclusion",
+          "research_type_c_abbreviated_coded"
+        ],
+        "stoppingReason": null
+      },
+      "budget": {
+        "maximumSearchShapes": 4,
+        "maximumDocumentFetches": 3,
+        "maximumSynthesisCalls": 1,
+        "maximumExternalOperations": 8,
+        "minimumDistinctNoEvidenceShapesBeforeStop": 2,
+        "exceptionalEscalationAllowed": false
+      },
+      "queryShapes": [
+        {
+          "shapeId": "shape_01_exact_quoted_label",
+          "kind": "EXACT_QUOTED_LABEL",
+          "documentGenres": [
+            "exact_document"
+          ]
+        },
+        {
+          "shapeId": "shape_02_code_processor_document_genre",
+          "kind": "CODE_PROCESSOR_DOCUMENT_GENRE",
+          "documentGenres": [
+            "fee_schedule",
+            "merchant_application",
+            "statement_guide"
+          ]
+        },
+        {
+          "shapeId": "shape_03_same_platform_public_statement",
+          "kind": "SAME_PLATFORM_PUBLIC_STATEMENT",
+          "documentGenres": [
+            "same_platform_public_statement"
+          ]
+        }
+      ],
+      "operations": [
+        {
+          "ordinal": 1,
+          "type": "search",
+          "shapeKind": "EXACT_QUOTED_LABEL",
+          "status": "completed",
+          "reasonCodes": [
+            "search_candidates_discovered"
+          ]
+        },
+        {
+          "ordinal": 2,
+          "type": "search",
+          "shapeKind": "CODE_PROCESSOR_DOCUMENT_GENRE",
+          "status": "completed",
+          "reasonCodes": [
+            "search_candidates_discovered"
+          ]
+        },
+        {
+          "ordinal": 3,
+          "type": "search",
+          "shapeKind": "SAME_PLATFORM_PUBLIC_STATEMENT",
+          "status": "completed",
+          "reasonCodes": [
+            "search_candidates_discovered"
+          ]
+        },
+        {
+          "ordinal": 4,
+          "type": "document_fetch",
+          "shapeKind": null,
+          "status": "completed",
+          "reasonCodes": [
+            "fee_knowledge_text_retrieved"
+          ]
+        },
+        {
+          "ordinal": 5,
+          "type": "document_fetch",
+          "shapeKind": null,
+          "status": "completed",
+          "reasonCodes": [
+            "fee_knowledge_text_retrieved"
+          ]
+        },
+        {
+          "ordinal": 6,
+          "type": "document_fetch",
+          "shapeKind": null,
+          "status": "completed",
+          "reasonCodes": [
+            "fee_knowledge_text_retrieved"
+          ]
+        }
+      ],
+      "queryShapeResults": [
+        {
+          "shapeId": "shape_01_exact_quoted_label",
+          "kind": "EXACT_QUOTED_LABEL",
+          "candidateCount": 2,
+          "usefulCandidateCount": 0,
+          "reasonCodes": [
+            "candidate_utility_pending_retrieval"
+          ]
+        },
+        {
+          "shapeId": "shape_02_code_processor_document_genre",
+          "kind": "CODE_PROCESSOR_DOCUMENT_GENRE",
+          "candidateCount": 2,
+          "usefulCandidateCount": 0,
+          "reasonCodes": [
+            "candidate_utility_pending_retrieval"
+          ]
+        },
+        {
+          "shapeId": "shape_03_same_platform_public_statement",
+          "kind": "SAME_PLATFORM_PUBLIC_STATEMENT",
+          "candidateCount": 2,
+          "usefulCandidateCount": 0,
+          "reasonCodes": [
+            "candidate_utility_pending_retrieval"
+          ]
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://faq.paysafe.com/pos-devices/support/question/56/how-do-i-read-the-fees-charged-section-on-my-statement/",
+          "title": null,
+          "publisher": null,
+          "lane": "processor_own",
+          "discoveredByShapeIds": [
+            "shape_02_code_processor_document_genre",
+            "shape_03_same_platform_public_statement"
+          ],
+          "retrievalStatus": "retrieved_text",
+          "searchUseful": true,
+          "evidenceUseful": false,
+          "authorityState": "candidate_not_admitted",
+          "reasonCodes": [
+            "retrieved_text_not_specific_enough"
+          ]
+        },
+        {
+          "url": "https://faq.paysafe.com/pos-devices/support/question/53/what-are-the-miscellaneous-misc-additional-fees-section-on-my-statement/",
+          "title": null,
+          "publisher": null,
+          "lane": "processor_own",
+          "discoveredByShapeIds": [
+            "shape_02_code_processor_document_genre"
+          ],
+          "retrievalStatus": "retrieved_text",
+          "searchUseful": true,
+          "evidenceUseful": false,
+          "authorityState": "candidate_not_admitted",
+          "reasonCodes": [
+            "retrieved_text_not_specific_enough"
+          ]
+        },
+        {
+          "url": "https://www.scribd.com/document/968411596/Statement",
+          "title": null,
+          "publisher": null,
+          "lane": "same_platform_statement",
+          "discoveredByShapeIds": [
+            "shape_03_same_platform_public_statement"
+          ],
+          "retrievalStatus": "retrieved_text",
+          "searchUseful": true,
+          "evidenceUseful": false,
+          "authorityState": "candidate_not_admitted",
+          "reasonCodes": [
+            "retrieved_text_not_specific_enough"
+          ]
+        }
+      ],
+      "provisionalSynthesis": null,
+      "governedD1D4Changed": false,
+      "governedConfidenceChanged": false,
+      "canonicalFingerprintUnchanged": true,
+      "stoppingDecision": {
+        "stop": true,
+        "stoppingReason": "S4_SOURCE_QUALITY_FAILURE",
+        "reasonCodes": [
+          "retrieved_evidence_low_quality_duplicative_or_inapplicable"
+        ]
+      }
+    },
+    {
+      "caseId": "cpu_gateway_stage0_control",
+      "execution": "STAGE0_CONTROL",
+      "file": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Oct_2025.pdf",
+      "printedLabel": "MASTERCARD - CPU GTWY",
+      "primaryType": "D_NETWORK_LOOKING",
+      "applicableTypes": [
+        "D_NETWORK_LOOKING",
+        "C_ABBREVIATED_CODED",
+        "E_THIRD_PARTY_OR_SERVICE",
+        "F_UNFAMILIAR_PER_ITEM_OR_RECURRING"
+      ],
+      "stage0": {
+        "decision": "STOP_WITHOUT_EXTERNAL_RESEARCH",
+        "determinantSufficient": true,
+        "exactIdentityMateriallyChangesConclusion": false,
+        "unresolvedMaterialDeterminant": false,
+        "reasonCodes": [
+          "governed_open_world_research_not_escalated",
+          "determinants_sufficient_exact_identity_not_required"
+        ],
+        "stoppingReason": "S1_DETERMINANT_SUFFICIENCY"
+      },
+      "budget": {
+        "maximumSearchShapes": 0,
+        "maximumDocumentFetches": 0,
+        "maximumSynthesisCalls": 0,
+        "maximumExternalOperations": 0,
+        "minimumDistinctNoEvidenceShapesBeforeStop": 2,
+        "exceptionalEscalationAllowed": false
+      },
+      "queryShapes": [],
+      "operations": [],
+      "queryShapeResults": [],
+      "sources": [],
+      "provisionalSynthesis": null,
+      "governedD1D4Changed": false,
+      "governedConfidenceChanged": false,
+      "canonicalFingerprintUnchanged": true,
+      "stoppingDecision": {
+        "stop": true,
+        "stoppingReason": "S1_DETERMINANT_SUFFICIENCY",
+        "reasonCodes": [
+          "governed_open_world_research_not_escalated",
+          "determinants_sufficient_exact_identity_not_required"
+        ]
+      }
+    }
+  ],
+  "researchQuality": {
+    "cases": 5,
+    "researchCases": 4,
+    "stage0Stops": 1,
+    "determinantLiftCases": 0,
+    "actionLiftCases": 0,
+    "evidenceTierImprovementCases": 0,
+    "researchEfficiency": {
+      "usefulCases": 0,
+      "totalExternalOperations": 24,
+      "usefulCasesPerExternalOperation": 0
+    },
+    "wastedBudgetRatePercent": 0,
+    "queryShapeYield": {
+      "EXACT_QUOTED_LABEL": {
+        "executed": 3,
+        "usableEvidence": 0
+      },
+      "PROCESSOR_EXACT_LABEL": {
+        "executed": 1,
+        "usableEvidence": 0
+      },
+      "CODE_PROCESSOR_DOCUMENT_GENRE": {
+        "executed": 2,
+        "usableEvidence": 0
+      },
+      "SAME_PLATFORM_PUBLIC_STATEMENT": {
+        "executed": 2,
+        "usableEvidence": 0
+      },
+      "MECHANIC_POPULATION_HYPOTHESIS": {
+        "executed": 2,
+        "usableEvidence": 1
+      },
+      "PROCESSOR_FEE_SCHEDULE": {
+        "executed": 2,
+        "usableEvidence": 0
+      }
+    },
+    "sourceQualityDistribution": {
+      "processor_own": {
+        "found": 7,
+        "useful": 2,
+        "authorityAccepted": 0
+      },
+      "acquirer_or_iso": {
+        "found": 0,
+        "useful": 0,
+        "authorityAccepted": 0
+      },
+      "same_platform_statement": {
+        "found": 2,
+        "useful": 0,
+        "authorityAccepted": 0
+      },
+      "procurement_or_institutional": {
+        "found": 0,
+        "useful": 0,
+        "authorityAccepted": 0
+      },
+      "specialist_industry": {
+        "found": 0,
+        "useful": 0,
+        "authorityAccepted": 0
+      },
+      "generic_or_ai_navigation": {
+        "found": 2,
+        "useful": 0,
+        "authorityAccepted": 0
+      }
+    },
+    "correctionTracking": {
+      "downgraded": 0,
+      "corrected": 0,
+      "reversed": 0
+    }
+  },
+  "candidateKnowledge": [],
+  "providerAccounting": {
+    "callsWithUsageReceipts": 13,
+    "requestIds": [
+      "resp_0ca93847db6f26aa016aa0047de2a087d29e55e3c3e5667231",
+      "resp_01f8e84750b1f57a016aa0048abd3c87d291573899fbaf0e1a",
+      "resp_090d7b8fc08b8b78016aa00496059087d28652f85b855f35d7",
+      "resp_050f04410e653bd2016aa004a2700c87d282288bbc8842eac2",
+      "resp_0e9b59a8b405bd5a016aa004b45e4c87d2a84c961f3b5ae5cc",
+      "resp_079334ea07bd2683016aa004c6337487d2a885a80c9d777383",
+      "resp_0fa23fbdd41a2ff8016aa004d479bc87d28ad8ede6859c11d1",
+      "resp_0ded801616448d7b016aa004e47e8087d29e223232675c4fde",
+      "resp_0f86022a6da799d2016aa004f3e14887d28ffc92a0dedeb09d",
+      "resp_0d216a5593d34878016aa0050434ac87d293335df47a20f6b7",
+      "resp_0ec3731c7cc75352016aa00508e27c87d2898f085215ab8b0c",
+      "resp_00a2b45bc48282ef016aa005169d7c87d286d4404ef472261a",
+      "resp_0a23755b3920c7c7016aa0052391a887d2b4d9ae8d31b69d1a"
+    ],
+    "inputTokens": 156824,
+    "outputTokens": 6208,
+    "webSearchToolCalls": 23
+  },
+  "safety": {
+    "reusableKnowledgeSelfAdmitted": false,
+    "governedD1D4ChangedCases": 0,
+    "governedConfidenceChangedCases": 0,
+    "canonicalFinancialFingerprintChangedCases": 0,
+    "allCanonicalFinancialFingerprintsUnchanged": true,
+    "stage0ControlExternalOperations": 0
+  }
+}

@@ -495,6 +495,7 @@ function buildAnalysisEnvelope(input: {
     evidence: input.evidence,
     calculations: input.calculations,
   });
+  captureAmexProgramDetailSubtotalEvidence(input.doc, input.documentId, input.matched, input.evidence);
   const crossSummaryLinkEvidence = buildCanonicalCrossSummaryLinkEvidence({
     doc: input.doc,
     documentId: input.documentId,
@@ -574,6 +575,40 @@ function buildAnalysisEnvelope(input: {
     validation: { status: "valid", errors: [], warnings: [] },
     versionManifest: buildVersionManifest({ parserId: input.matched.driverId }),
   };
+}
+
+/**
+ * Preserve the separately printed Amex program-detail subtotal as statement
+ * evidence.  It is reference-only: it does not enter the fee ledger or any
+ * canonical financial total.  The governed pricing layer may compare it with
+ * a billed PROGRAM FEES row, but a matching label alone is never enough.
+ */
+function captureAmexProgramDetailSubtotalEvidence(
+  doc: ParsedDocument,
+  documentId: string,
+  matched: MatchedOutput,
+  evidence: Map<string, CanonicalEvidenceRecord>,
+): void {
+  for (const [rowIndex, sourceRow] of doc.rows.entries()) {
+    const content = String(sourceRow.content ?? "");
+    if (!/^\s*AMEXCT\d+\s+TOTAL\b/i.test(content)) continue;
+    const amountTokens = content.match(/-?\$?\d{1,3}(?:,\d{3})*(?:\.\d{2})|-?\$?\d+\.\d{2}/g) ?? [];
+    const last = amountTokens.at(-1);
+    if (!last) continue;
+    const amount = Math.abs(Number(last.replace(/[$,]/g, "")));
+    if (!Number.isFinite(amount)) continue;
+    addEvidence(
+      evidence,
+      documentId,
+      content,
+      pageFromRow(sourceRow),
+      rowIndex,
+      "amex_acquired_program_cost_total",
+      matched,
+      moneyFromNumber(amount),
+      { section: "INTERCHANGE CHARGES/PROGRAM FEES" },
+    );
+  }
 }
 
 function findParserOutput(doc: ParsedDocument, options: BuildOptions): MatchedOutput {

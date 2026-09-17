@@ -1,3 +1,5 @@
 # Frozen normative Markdown preserves intentional hard breaks and exact accepted bytes.
 docs/product-model/frozen/**/*.md whitespace=-trailing-space,-blank-at-eof
 docs/product-model/amendments/RateReveal_Runtime_Intelligence_Policy_Amendment_v0_3.md whitespace=-trailing-space,-blank-at-eof
+evaluations/governed-conflict-diagnostic-v1/report-2026-09-09.md whitespace=-trailing-space
+evaluations/governed-conflict-resolution-historical-current-firewall-v1/report-2026-09-09.md whitespace=-blank-at-eof

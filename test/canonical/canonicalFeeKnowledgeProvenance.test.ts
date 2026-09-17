@@ -358,6 +358,7 @@ describe("canonical fee knowledge and provenance", () => {
     expect(requests[0]?.url).toBe("https://api.openai.com/v1/responses");
     expect(requests[0]?.signal).toBeInstanceOf(AbortSignal);
     expect(requests[0]?.body).toContain('"web_search"');
+    expect(JSON.parse(requests[0]!.body)).toMatchObject({ store: false });
     expect(requests[0]?.body).not.toMatch(/merchant|account|\$|statement\.pdf|raw/i);
 	    expect(candidates).toEqual([
 	      { url: "https://syntheticprocessor.test/fees", title: "Synthetic Official Fee Guide", publisher: null },

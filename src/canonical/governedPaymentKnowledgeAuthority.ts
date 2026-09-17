@@ -9,9 +9,61 @@ import {
 } from "./feeSemanticsShadowStatementIntegration.js";
 import type { CanonicalStatementAnalysis } from "./types.js";
 import type { FeeSemanticSourceAuthority } from "./feeSemanticsEvidenceModel.js";
+import {
+  GOVERNED_PRICING_LAYER_KNOWLEDGE_V1,
+  governedPricingLayerRulesV1,
+  resolveGovernedPricingLayerKnowledgeV1,
+  type GovernedPricingLayerResolution,
+  type GovernedPricingObservationInput,
+} from "./governedPricingLayerKnowledgeV1.js";
+import {
+  GOVERNED_PER_ITEM_KNOWLEDGE_V1,
+  governedPerItemRulesV1,
+  resolveGovernedPerItemKnowledgeV1,
+  type GovernedPerItemResolution,
+} from "./governedPerItemKnowledgeV1.js";
+import {
+  GOVERNED_DATED_NETWORK_FEE_EVIDENCE_V1,
+  governedDatedNetworkRulesV1,
+  governedNetworkNoticeEventsV1,
+  resolveGovernedDatedNetworkFeeEvidenceV1,
+  type GovernedDatedNetworkFeeEvidenceResolution,
+} from "./governedDatedNetworkFeeEvidenceV1.js";
+import {
+  GOVERNED_US_NETWORK_FEE_EVIDENCE_2020_2026_V1,
+  governedUsNetworkReferenceRecords2020_2026V1,
+  governedUsNetworkRules2020_2026V1,
+  governedUsNetworkSources2020_2026V1,
+  resolveGovernedUsNetworkFeeEvidence2020_2026V1,
+  type GovernedUsNetworkFeeEvidenceResolution,
+} from "./governedUsNetworkFeeEvidence2020_2026V1.js";
+import {
+  GOVERNED_MASTERCARD_FOCUSED_EVIDENCE_2024_2026_V1,
+  governedMastercardFocusedRecords2024_2026V1,
+  governedMastercardFocusedRules2024_2026V1,
+  governedMastercardFocusedSources2024_2026V1,
+  resolveGovernedMastercardFocusedEvidence2024_2026V1,
+  type GovernedMastercardFocusedEvidenceResolution,
+} from "./governedMastercardFocusedEvidence2024_2026V1.js";
+import {
+  GOVERNED_CURRENT_2026_US_CORE_NETWORK_REFERENCE_V1,
+  governedCurrent2026ReferenceRecordsV1,
+  governedCurrent2026RulesV1,
+  governedCurrent2026SourcesV1,
+  resolveGovernedCurrent2026UsCoreNetworkReferenceV1,
+  type GovernedCurrent2026UsCoreNetworkResolution,
+} from "./governedCurrent2026UsCoreNetworkReferenceV1.js";
+import {
+  GOVERNED_OPEN_WORLD_DETERMINANT_V1,
+  governedOpenWorldActionClassesV1,
+  governedOpenWorldFeeFamiliesV1,
+  governedOpenWorldRulesV1,
+  resolveGovernedOpenWorldDeterminantV1,
+  type GovernedOpenWorldDeterminantResolution,
+} from "./governedOpenWorldDeterminantV1.js";
 
 export const GOVERNED_PAYMENT_KNOWLEDGE_AUTHORITY_VERSION =
-  "governed_payment_knowledge_authority_2026_09_06_v1" as const;
+  "governed_payment_knowledge_authority_2026_09_08_open_world_determinant_v1" as const;
 
 export type GovernedNormUnit =
   | "usd_per_event"
@@ -52,6 +104,13 @@ export type GovernedKnowledgeResolution = {
   semantics: FeeSemanticsShadowStatementReport;
   normsByFeeRowId: Readonly<Record<string, GovernedIndustryNorm[]>>;
   semanticSourceAuthorityByEvidenceRef: Readonly<Record<string, FeeSemanticSourceAuthority>>;
+  pricingLayers: GovernedPricingLayerResolution;
+  perItem: GovernedPerItemResolution;
+  datedNetworkFeeEvidence: GovernedDatedNetworkFeeEvidenceResolution;
+  usNetworkFeeEvidence: GovernedUsNetworkFeeEvidenceResolution;
+  mastercardFocusedEvidence: GovernedMastercardFocusedEvidenceResolution;
+  current2026UsCoreNetworkReference: GovernedCurrent2026UsCoreNetworkResolution;
+  openWorldDeterminants: GovernedOpenWorldDeterminantResolution;
   authorityVersion: typeof GOVERNED_PAYMENT_KNOWLEDGE_AUTHORITY_VERSION;
   semanticCatalogVersion: string;
   normCatalogVersion: string;
@@ -203,9 +262,10 @@ export class GovernedPaymentKnowledgeAuthority {
   readonly normCatalogVersion = NORM_VERSION;
 
   resolveStatement(input: {
-    analysis: Pick<CanonicalStatementAnalysis, "identity" | "feeLedger">;
+    analysis: CanonicalStatementAnalysis;
     context: FeeSemanticsShadowStatementContext;
     asOf?: string;
+    suppliedPricingObservation?: GovernedPricingObservationInput | null;
   }): GovernedKnowledgeResolution {
     const semantics = buildFeeSemanticsShadowStatementReport({
       analysis: input.analysis,
@@ -220,10 +280,60 @@ export class GovernedPaymentKnowledgeAuthority {
     const semanticSourceAuthorityByEvidenceRef = Object.fromEntries(
       QUALIFIED_FEE_SEMANTICS_FISERV_ALIAS_PACK_V1.catalog.evidence.map((item) => [item.evidenceId, item.sourceAuthority]),
     );
+    const pricingLayers = resolveGovernedPricingLayerKnowledgeV1({
+      analysis: input.analysis,
+      suppliedPricingObservation: input.suppliedPricingObservation,
+    });
+    const perItem = resolveGovernedPerItemKnowledgeV1({
+      analysis: input.analysis,
+      semanticRows: semantics.rows,
+    });
+    const datedNetworkFeeEvidence = resolveGovernedDatedNetworkFeeEvidenceV1({
+      analysis: input.analysis,
+      semanticRows: semantics.rows,
+      perItemRowsByFeeRowId: perItem.rowsByFeeRowId,
+    });
+    const usNetworkFeeEvidence = resolveGovernedUsNetworkFeeEvidence2020_2026V1({
+      analysis: input.analysis,
+      datedNetworkEvidence: datedNetworkFeeEvidence,
+    });
+    const mastercardFocusedEvidence = resolveGovernedMastercardFocusedEvidence2024_2026V1({
+      analysis: input.analysis,
+      usNetworkFeeEvidence,
+    });
+    const current2026UsCoreNetworkReference = resolveGovernedCurrent2026UsCoreNetworkReferenceV1({
+      analysis: input.analysis,
+      usNetworkRowsByFeeRowId: Object.fromEntries(
+        Object.entries(mastercardFocusedEvidence.rowsByFeeRowId).map(([feeRowId, row]) => [feeRowId, row.effectiveUsNetworkEvidence]),
+      ),
+      mastercardFocusedRowsByFeeRowId: mastercardFocusedEvidence.rowsByFeeRowId,
+      asOf,
+    });
+    const openWorldDeterminants = resolveGovernedOpenWorldDeterminantV1({
+      analysis: input.analysis,
+      semanticRows: semantics.rows,
+      pricingLayers,
+      perItem,
+      datedNetworkFeeEvidence,
+      usNetworkFeeEvidence: {
+        ...usNetworkFeeEvidence,
+        rowsByFeeRowId: Object.fromEntries(
+          Object.entries(mastercardFocusedEvidence.rowsByFeeRowId).map(([feeRowId, row]) => [feeRowId, row.effectiveUsNetworkEvidence]),
+        ),
+      },
+      current2026UsCoreNetworkReference,
+    });
     return deepFreeze({
       semantics,
       normsByFeeRowId,
       semanticSourceAuthorityByEvidenceRef,
+      pricingLayers,
+      perItem,
+      datedNetworkFeeEvidence,
+      usNetworkFeeEvidence,
+      mastercardFocusedEvidence,
+      current2026UsCoreNetworkReference,
+      openWorldDeterminants,
       authorityVersion: this.authorityVersion,
       semanticCatalogVersion: semantics.catalogVersion,
       normCatalogVersion: this.normCatalogVersion,
@@ -249,6 +359,29 @@ export class GovernedPaymentKnowledgeAuthority {
       authorityVersion: this.authorityVersion,
       semanticCatalogVersion: QUALIFIED_FEE_SEMANTICS_FISERV_ALIAS_PACK_V1.catalog.catalogVersion,
       normCatalogVersion: this.normCatalogVersion,
+      pricingLayerCatalogVersion: GOVERNED_PRICING_LAYER_KNOWLEDGE_V1,
+      pricingLayerRules: governedPricingLayerRulesV1(),
+      perItemCatalogVersion: GOVERNED_PER_ITEM_KNOWLEDGE_V1,
+      perItemRules: governedPerItemRulesV1(),
+      datedNetworkFeeEvidenceCatalogVersion: GOVERNED_DATED_NETWORK_FEE_EVIDENCE_V1,
+      datedNetworkFeeEvidenceRules: governedDatedNetworkRulesV1(),
+      datedNetworkNoticeEvents: governedNetworkNoticeEventsV1(),
+      usNetworkFeeEvidenceCatalogVersion: GOVERNED_US_NETWORK_FEE_EVIDENCE_2020_2026_V1,
+      usNetworkFeeEvidenceSources: governedUsNetworkSources2020_2026V1(),
+      usNetworkFeeEvidenceRecords: governedUsNetworkReferenceRecords2020_2026V1(),
+      usNetworkFeeEvidenceRules: governedUsNetworkRules2020_2026V1(),
+      mastercardFocusedEvidenceCatalogVersion: GOVERNED_MASTERCARD_FOCUSED_EVIDENCE_2024_2026_V1,
+      mastercardFocusedEvidenceSources: governedMastercardFocusedSources2024_2026V1(),
+      mastercardFocusedEvidenceRecords: governedMastercardFocusedRecords2024_2026V1(),
+      mastercardFocusedEvidenceRules: governedMastercardFocusedRules2024_2026V1(),
+      current2026UsCoreNetworkReferenceCatalogVersion: GOVERNED_CURRENT_2026_US_CORE_NETWORK_REFERENCE_V1,
+      current2026UsCoreNetworkReferenceSources: governedCurrent2026SourcesV1(),
+      current2026UsCoreNetworkReferenceRecords: governedCurrent2026ReferenceRecordsV1(),
+      current2026UsCoreNetworkReferenceRules: governedCurrent2026RulesV1(),
+      openWorldDeterminantCatalogVersion: GOVERNED_OPEN_WORLD_DETERMINANT_V1,
+      openWorldDeterminantFamilies: governedOpenWorldFeeFamiliesV1(),
+      openWorldDeterminantActionClasses: governedOpenWorldActionClassesV1(),
+      openWorldDeterminantRules: governedOpenWorldRulesV1(),
       norms: NORMS,
     })).digest("hex");
   }

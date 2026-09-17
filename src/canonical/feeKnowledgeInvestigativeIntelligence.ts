@@ -139,6 +139,7 @@ export function openAiInvestigativeIntelligenceAdapter(
         body: JSON.stringify({
           model: options.openAiModelName ?? process.env.OPENAI_MODEL ?? DEFAULT_OPENAI_INVESTIGATIVE_MODEL,
           input,
+          store: false,
           reasoning: { effort: "low" },
           text: { format: investigativeOutputJsonSchema() },
           max_output_tokens: options.maximumOutputTokens ?? OPENAI_INVESTIGATIVE_INTELLIGENCE_MAX_OUTPUT_TOKENS,
