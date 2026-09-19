@@ -89,11 +89,22 @@ test("trusted workflow pins every executable security tool and contains no artif
   }
   assert.ok(workflow.includes(sha256(await fs.readFile(path.join(root, "config/private-corpus-ci-pins.json")))));
   assert.ok(!/pull_request_target|workflow_run|upload-artifact|cache:\s*npm/i.test(workflow));
+  const immutableBootstrap = "ref: f7a3e83371af2ae5ecd275f60c4e284e549f7277";
+  assert.equal(workflow.split(immutableBootstrap).length - 1, 3);
+  assert.ok(!workflow.includes("ref: main"));
+  const canary = workflow.split("  synthetic_runtime_canary:")[1]?.split("\n  secure:")[0];
+  assert.ok(canary);
+  assert.ok(!canary.includes("id-token: write"));
+  assert.ok(!canary.includes("environment:"));
+  assert.ok(canary.includes("package_identity_unconfigured"));
   const productionPins = JSON.parse(await fs.readFile(path.join(root, "config/private-corpus-ci-pins.json"), "utf8"));
   assert.throws(() => validatePins(productionPins), /package_identity_unconfigured/);
   const caller = await fs.readFile(path.join(root, ".github/workflows/ci.yml"), "utf8");
   assert.match(caller, /private-corpus-trusted\.yml@[a-f0-9]{40}/);
   assert.ok(!caller.includes("RATEREVEAL_PRIVATE_CORPUS_WAIVER_ID"));
+  const vercel = JSON.parse(await fs.readFile(path.join(root, "vercel.json"), "utf8"));
+  assert.equal(vercel.git.deploymentEnabled["codex/secure-ci-corpus-provisioning"], false);
+  assert.equal(vercel.git.deploymentEnabled.main, undefined);
 });
 
 test("missing real package pin fails closed", () => {

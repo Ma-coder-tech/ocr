@@ -20,11 +20,11 @@ jobs:
       base_sha: ${{ steps.gate.outputs.base_sha }}
       package_version: ${{ steps.gate.outputs.package_version }}
     steps:
-      - name: Check out protected-main security tools only
+      - name: Check out immutable reviewed security tools only
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Ma-coder-tech/ocr
-          ref: main
+          ref: f7a3e83371af2ae5ecd275f60c4e284e549f7277
           path: trusted-private-ci
           persist-credentials: false
       - name: Verify the pinned trusted gate
@@ -47,6 +47,75 @@ jobs:
           RATEREVEAL_PRIVATE_CI_APPROVAL: ${{ vars.RATEREVEAL_PRIVATE_CI_APPROVAL }}
         run: node trusted-private-ci/scripts/private-corpus-ci-gate.mjs classify
 
+  synthetic_runtime_canary:
+    name: synthetic-runtime-canary
+    needs: classify
+    if: needs.classify.result == 'success' && needs.classify.outputs.required == 'false' && github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'codex/secure-ci-corpus-provisioning'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Check out immutable reviewed security tools only
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Ma-coder-tech/ocr
+          ref: f7a3e83371af2ae5ecd275f60c4e284e549f7277
+          path: trusted-private-ci
+          persist-credentials: false
+      - name: Verify trusted canary tools and unconfigured package pins
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(sha256sum trusted-private-ci/scripts/private-corpus-ci-gate.mjs | cut -d' ' -f1)" = "dd984dd0fd246ce4afb10fe16974513f19c21672b3f5a116991cd9f114582e24"
+          test "$(sha256sum trusted-private-ci/scripts/private-corpus-ci-gcp.mjs | cut -d' ' -f1)" = "352505f50141a1fdccf911dcf4cd0bd669df528abd33b57e3f2a5f0e347e1f5e"
+          test "$(sha256sum trusted-private-ci/scripts/private-corpus-ci-preflight.mjs | cut -d' ' -f1)" = "f26a22053e7041cded7c4b32c05885540e5bd6a12b43ff878aadc91f214fad0c"
+          test "$(sha256sum trusted-private-ci/config/private-corpus-ci-pins.json | cut -d' ' -f1)" = "b57e0175e076b5276380083535a2dfbb61d893cce7d717527e83242fe7fbb928"
+      - name: Recheck live PR and prove secure job is ineligible
+        shell: bash
+        env:
+          CI_EVENT_NAME: ${{ github.event_name }}
+          CI_REPOSITORY: ${{ github.repository }}
+          CI_REPOSITORY_ID: ${{ github.repository_id }}
+          CI_OWNER_ID: ${{ github.repository_owner_id }}
+          CI_REF: ${{ github.ref }}
+          CI_SHA: ${{ github.sha }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          set +e
+          denial="$(node trusted-private-ci/scripts/private-corpus-ci-gate.mjs authorize 2>&1)"
+          result=$?
+          set -e
+          test "$result" -eq 1
+          test "$denial" = '{"status":"denied","code":"secure_validation_not_required"}'
+          printf '%s\n' "$denial"
+      - name: Check out the exact classified PR head without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Ma-coder-tech/ocr
+          ref: ${{ needs.classify.outputs.head_sha }}
+          path: validated
+          persist-credentials: false
+      - name: Verify exact-head checkout and intended package denial before OIDC
+        shell: bash
+        env:
+          EXPECTED_HEAD_SHA: ${{ needs.classify.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git -C validated rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+          set +e
+          denial="$(node trusted-private-ci/scripts/private-corpus-ci-gcp.mjs trusted-private-ci/config/private-corpus-ci-pins.json 2>&1)"
+          result=$?
+          set -e
+          test "$result" -eq 1
+          test "$denial" = '{"status":"failed","code":"package_identity_unconfigured"}'
+          printf '%s\n' "$denial"
+      - name: Remove any runner-local package/test material
+        if: always()
+        run: node trusted-private-ci/scripts/private-corpus-ci-preflight.mjs cleanup
+
   secure:
     name: secure
     needs: classify
@@ -59,11 +128,11 @@ jobs:
       pull-requests: read
       id-token: write
     steps:
-      - name: Check out protected-main security tools only
+      - name: Check out immutable reviewed security tools only
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Ma-coder-tech/ocr
-          ref: main
+          ref: f7a3e83371af2ae5ecd275f60c4e284e549f7277
           path: trusted-private-ci
           persist-credentials: false
       - name: Verify independently pinned trusted security tools and pins
@@ -156,7 +225,7 @@ jobs:
 
   policy-result:
     name: private-corpus-policy
-    needs: [classify, secure]
+    needs: [classify, synthetic_runtime_canary, secure]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -168,13 +237,22 @@ jobs:
         env:
           CLASSIFY_RESULT: ${{ needs.classify.result }}
           REQUIRED: ${{ needs.classify.outputs.required }}
+          SYNTHETIC_RESULT: ${{ needs.synthetic_runtime_canary.result }}
           SECURE_RESULT: ${{ needs.secure.result }}
+          CI_EVENT_NAME: ${{ github.event_name }}
+          CI_HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
           set -euo pipefail
           test "$CLASSIFY_RESULT" = success
           if test "$REQUIRED" = true; then
             test "$SECURE_RESULT" = success
+            test "$SYNTHETIC_RESULT" = skipped
           else
             test "$REQUIRED" = false
             test "$SECURE_RESULT" = skipped
+            if test "$CI_EVENT_NAME" = pull_request && test "$CI_HEAD_REF" = codex/secure-ci-corpus-provisioning; then
+              test "$SYNTHETIC_RESULT" = success
+            else
+              test "$SYNTHETIC_RESULT" = skipped
+            fi
           fi

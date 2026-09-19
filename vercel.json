@@ -11,5 +11,10 @@
       "src": "/(.*)",
       "dest": "api/index.ts"
     }
-  ]
+  ],
+  "git": {
+    "deploymentEnabled": {
+      "codex/secure-ci-corpus-provisioning": false
+    }
+  }
 }
