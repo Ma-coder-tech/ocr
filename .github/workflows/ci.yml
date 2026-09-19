@@ -199,4 +199,4 @@ jobs:
       contents: read
       pull-requests: read
       id-token: write
-    uses: Ma-coder-tech/ocr/.github/workflows/private-corpus-trusted.yml@f67fad0d5154ea878259e3a2bb933425a119016b
+    uses: Ma-coder-tech/ocr/.github/workflows/private-corpus-trusted.yml@c9d00aaeae81ea414136062b277dc7fb637111b5
