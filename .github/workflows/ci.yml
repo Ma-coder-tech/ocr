@@ -191,6 +191,7 @@ jobs:
         with:
           persist-credentials: false
       - run: node --test test/private-corpus-ci-security.test.mjs
+      - run: node --test test/private-corpus-merge-attest.test.mjs
       - run: npm run repo:clean-check
 
   private-corpus-policy:
