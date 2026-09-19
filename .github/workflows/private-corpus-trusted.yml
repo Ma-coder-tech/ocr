@@ -1,0 +1,178 @@
+name: Private corpus trusted validation
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  classify:
+    name: classify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      required: ${{ steps.gate.outputs.required }}
+      head_sha: ${{ steps.gate.outputs.head_sha }}
+      base_sha: ${{ steps.gate.outputs.base_sha }}
+      package_version: ${{ steps.gate.outputs.package_version }}
+    steps:
+      - name: Check out protected-main security tools only
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Ma-coder-tech/ocr
+          ref: main
+          path: trusted-private-ci
+          persist-credentials: false
+      - name: Verify the pinned trusted gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(sha256sum trusted-private-ci/scripts/private-corpus-ci-gate.mjs | cut -d' ' -f1)" = "dad618afc429c8cb119b0e480118d5b37e0f6f1fa49a35bad1af23d1998eeaac"
+      - name: Classify and authorize from authoritative GitHub event
+        id: gate
+        env:
+          CI_EVENT_NAME: ${{ github.event_name }}
+          CI_REPOSITORY: ${{ github.repository }}
+          CI_REPOSITORY_ID: ${{ github.repository_id }}
+          CI_OWNER_ID: ${{ github.repository_owner_id }}
+          CI_REF: ${{ github.ref }}
+          CI_SHA: ${{ github.sha }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RATEREVEAL_PRIVATE_CI_APPROVAL: ${{ vars.RATEREVEAL_PRIVATE_CI_APPROVAL }}
+        run: node trusted-private-ci/scripts/private-corpus-ci-gate.mjs classify
+
+  secure:
+    name: secure
+    needs: classify
+    if: needs.classify.result == 'success' && needs.classify.outputs.required == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: ratereveal-private-corpus
+    permissions:
+      contents: read
+      pull-requests: read
+      id-token: write
+    steps:
+      - name: Check out protected-main security tools only
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Ma-coder-tech/ocr
+          ref: main
+          path: trusted-private-ci
+          persist-credentials: false
+      - name: Verify independently pinned trusted security tools and pins
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(sha256sum trusted-private-ci/scripts/private-corpus-ci-gate.mjs | cut -d' ' -f1)" = "dad618afc429c8cb119b0e480118d5b37e0f6f1fa49a35bad1af23d1998eeaac"
+          test "$(sha256sum trusted-private-ci/scripts/private-corpus-ci-preflight.mjs | cut -d' ' -f1)" = "c0c3c6baf9e6f4043b53ace0a2602ffef94228463468f627e577bb4fa30364ab"
+          test "$(sha256sum trusted-private-ci/scripts/private-corpus-ci-gcp.mjs | cut -d' ' -f1)" = "fe4c45934aa6ab898b6abc3f9bcebf8fb246dc59eea6874cd6a5222a2d7c1bc3"
+          test "$(sha256sum trusted-private-ci/scripts/private-corpus-ci-results.mjs | cut -d' ' -f1)" = "8ba999acf21d313d2e0418ef1dad6f43abf26e4bde4af54ec165701fc6204bd5"
+          test "$(sha256sum trusted-private-ci/config/private-corpus-ci-pins.json | cut -d' ' -f1)" = "b57e0175e076b5276380083535a2dfbb61d893cce7d717527e83242fe7fbb928"
+      - name: Recheck live PR and exact Product approval
+        env:
+          CI_EVENT_NAME: ${{ github.event_name }}
+          CI_REPOSITORY: ${{ github.repository }}
+          CI_REPOSITORY_ID: ${{ github.repository_id }}
+          CI_OWNER_ID: ${{ github.repository_owner_id }}
+          CI_REF: ${{ github.ref }}
+          CI_SHA: ${{ github.sha }}
+          CI_CLASSIFIED_HEAD_SHA: ${{ needs.classify.outputs.head_sha }}
+          CI_CLASSIFIED_PACKAGE_VERSION: ${{ needs.classify.outputs.package_version }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RATEREVEAL_PRIVATE_CI_APPROVAL: ${{ vars.RATEREVEAL_PRIVATE_CI_APPROVAL }}
+        run: node trusted-private-ci/scripts/private-corpus-ci-gate.mjs authorize
+      - name: Check out the approved exact code SHA
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Ma-coder-tech/ocr
+          ref: ${{ needs.classify.outputs.head_sha }}
+          fetch-depth: 0
+          path: validated
+          persist-credentials: false
+      - name: Verify checked-out HEAD
+        shell: bash
+        env:
+          EXPECTED_HEAD_SHA: ${{ needs.classify.outputs.head_sha }}
+        run: test "$(git -C validated rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: validated/.node-version
+      - name: Install exact-head dependencies before corpus access
+        working-directory: validated
+        run: npm ci
+      - name: Recheck approval immediately before corpus access
+        env:
+          CI_EVENT_NAME: ${{ github.event_name }}
+          CI_REPOSITORY: ${{ github.repository }}
+          CI_REPOSITORY_ID: ${{ github.repository_id }}
+          CI_OWNER_ID: ${{ github.repository_owner_id }}
+          CI_REF: ${{ github.ref }}
+          CI_SHA: ${{ github.sha }}
+          CI_CLASSIFIED_HEAD_SHA: ${{ needs.classify.outputs.head_sha }}
+          CI_CLASSIFIED_PACKAGE_VERSION: ${{ needs.classify.outputs.package_version }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RATEREVEAL_PRIVATE_CI_APPROVAL: ${{ vars.RATEREVEAL_PRIVATE_CI_APPROVAL }}
+        run: node trusted-private-ci/scripts/private-corpus-ci-gate.mjs authorize
+      - name: Obtain short-lived read-only access and download approved package
+        env:
+          CI_APPROVED_PACKAGE_VERSION: ${{ needs.classify.outputs.package_version }}
+          CI_TRUSTED_WORKFLOW_SHA: ${{ secrets.RATEREVEAL_TRUSTED_WORKFLOW_SHA }}
+          RATEREVEAL_GCP_WIF_AUDIENCE: ${{ secrets.RATEREVEAL_GCP_WIF_AUDIENCE }}
+          RATEREVEAL_GCP_BUCKET: ${{ secrets.RATEREVEAL_GCP_BUCKET }}
+        run: node trusted-private-ci/scripts/private-corpus-ci-gcp.mjs trusted-private-ci/config/private-corpus-ci-pins.json
+      - name: Verify package and independently pinned source identity before extraction
+        run: node trusted-private-ci/scripts/private-corpus-ci-preflight.mjs verify trusted-private-ci/config/private-corpus-ci-pins.json
+      - name: Run exact-head canonical, Gold and private-corpus policy validators
+        working-directory: validated
+        env:
+          RATEREVEAL_PRIVATE_CORPUS_DIR: ${{ runner.temp }}/ratereveal-private-corpus
+          RATEREVEAL_POLICY_BASE_SHA: ${{ needs.classify.outputs.base_sha }}
+          RATEREVEAL_POLICY_HEAD_SHA: ${{ needs.classify.outputs.head_sha }}
+          FEECLEAR_DB_PATH: ${{ runner.temp }}/ratereveal-secure-validation.sqlite
+        run: node ../trusted-private-ci/scripts/private-corpus-ci-results.mjs .
+      - name: Reject a PR update during validation
+        env:
+          CI_EVENT_NAME: ${{ github.event_name }}
+          CI_REPOSITORY: ${{ github.repository }}
+          CI_REPOSITORY_ID: ${{ github.repository_id }}
+          CI_OWNER_ID: ${{ github.repository_owner_id }}
+          CI_REF: ${{ github.ref }}
+          CI_SHA: ${{ github.sha }}
+          CI_CLASSIFIED_HEAD_SHA: ${{ needs.classify.outputs.head_sha }}
+          CI_CLASSIFIED_PACKAGE_VERSION: ${{ needs.classify.outputs.package_version }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RATEREVEAL_PRIVATE_CI_APPROVAL: ${{ vars.RATEREVEAL_PRIVATE_CI_APPROVAL }}
+        run: node trusted-private-ci/scripts/private-corpus-ci-gate.mjs authorize
+      - name: Remove restricted runner-local material
+        if: always()
+        run: node trusted-private-ci/scripts/private-corpus-ci-preflight.mjs cleanup
+
+  policy-result:
+    name: private-corpus-policy
+    needs: [classify, secure]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Require classified outcome and secure validation when applicable
+        shell: bash
+        env:
+          CLASSIFY_RESULT: ${{ needs.classify.result }}
+          REQUIRED: ${{ needs.classify.outputs.required }}
+          SECURE_RESULT: ${{ needs.secure.result }}
+        run: |
+          set -euo pipefail
+          test "$CLASSIFY_RESULT" = success
+          if test "$REQUIRED" = true; then
+            test "$SECURE_RESULT" = success
+          else
+            test "$REQUIRED" = false
+            test "$SECURE_RESULT" = skipped
+          fi

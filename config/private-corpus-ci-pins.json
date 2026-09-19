@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "ratereveal_private_ci_pins_v1",
+  "package": {
+    "version": null,
+    "sha256": null,
+    "gcpObject": null,
+    "gcpGeneration": null
+  },
+  "goldManifestSha256": "fd149ab2290f584eddc55fc05172205ad15a503e22e4f9e12ef1250db29d62fd",
+  "canonicalManifestSha256": "37a78a62be657b659d4b3353c6d33fddccca2a38d99691f5f3755c4551c48188",
+  "productProvenanceSha256": "064ca7282cce29acaa56347d549c082dc610786a96e6b2129fe24cf42e8db66d",
+  "approvedDocuments": {
+    "G1": "1f0e1a8c822f9dd086ec00caaec9ab5f7a2fbb1e322928fbac1a704f1d14d230",
+    "G2": "a863eb9116197a5866d789e9f4ed95dae71d9b2c21ebe4dcfa029314cc842789",
+    "G3": "85ad4d064b9a5a3d808b509e0939f53742134cb18804ee572632b018c2bc2cd8",
+    "G4": "2aa3902cff949b6a746d140d690f566088b0eb8f5310b1f363207063932b24c7",
+    "G5": "25818af711fdcd1fec7b764fa95fa255306fda52ee223b31091311cafb1cc4d8",
+    "G6": "248ea46ee1f277f7f8129b724927ddea3f545adf91dff94622f27552f4024802",
+    "G7": "886d6b21c7936eb8a9d8d1b7b3de1a11bb89b9bab8ac858ca0988a18f3436626",
+    "G8": "6b386ad6d458b3c96e9c313a0dcb779ec5838f2093ca623483df80afb3fa3920"
+  },
+  "canonicalPrivateCaseId": "private-fiserv-restaurant-count-001",
+  "canonicalGoldCaseId": "G4"
+}
