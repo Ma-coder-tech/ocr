@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -193,6 +194,55 @@ describe("canonical golden corpus schema", () => {
       status: "skipped",
       reason: "RATEREVEAL_PRIVATE_CORPUS_DIR is not set.",
     });
+  });
+
+  it("emits one parseable JSON result while keeping PDF diagnostics off stdout", async () => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "ratereveal-private-corpus-output-"));
+    try {
+      await fs.copyFile(
+        path.resolve(process.cwd(), "test/fixtures/canonical/synthetic-pdfs/fiserv-summary-synthetic.pdf"),
+        path.join(tempDir, "synthetic-private.pdf"),
+      );
+      await fs.writeFile(
+        path.join(tempDir, "private-fiserv-restaurant-count-001.json"),
+        JSON.stringify({
+          schemaVersion: "private_corpus_manifest_v1",
+          privateCorpusCaseId: "private-fiserv-restaurant-count-001",
+          documentFile: "synthetic-private.pdf",
+          actualValueExtractors: [
+            {
+              field: "source.observedSubmittedItemCount",
+              source: "pdf_text",
+              pattern: "Total Amount Submitted(?:\\s*\\|\\s*|\\s+)\\$?([0-9,]+)",
+              valueType: "integer",
+            },
+          ],
+        }),
+      );
+
+      const result = spawnSync(
+        process.execPath,
+        ["scripts/run-node-tool.mjs", "--import", "tsx", "scripts/canonical-secure-corpus-runner.ts"],
+        {
+          cwd: process.cwd(),
+          env: { ...process.env, RATEREVEAL_PRIVATE_CORPUS_DIR: tempDir },
+          encoding: "utf8",
+          timeout: 30_000,
+        },
+      );
+
+      expect(result.status).toBe(0);
+      expect(JSON.parse(result.stdout)).toMatchObject({
+        status: "configured",
+        publicPrivateCasesExpected: 1,
+        privateCasesExecuted: 1,
+        missingManifestCount: 0,
+      });
+      expect(result.stdout).not.toContain("[pdf-layout-parse]");
+      expect(result.stderr).toContain("[pdf-layout-parse]");
+    } finally {
+      await fs.rm(tempDir, { recursive: true, force: true });
+    }
   });
 
   it("derives private-corpus actual values from extracted document text instead of known-failure metadata", async () => {
