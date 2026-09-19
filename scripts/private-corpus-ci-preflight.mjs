@@ -137,6 +137,7 @@ export function verifyPackage(bytes, pinsInput) {
     reject("canonical_binding_invalid");
   }
   if (!Array.isArray(provenance.goldBindings) || provenance.goldBindings.length !== 8 ||
+      new Set(provenance.goldBindings.map((item) => item?.caseId)).size !== 8 ||
       provenance.goldBindings.some((item) => !seen.has(item?.caseId) || item.sha256 !== pins.approvedDocuments[item.caseId]) ||
       provenance.canonicalPrivateCase?.privateCorpusCaseId !== pins.canonicalPrivateCaseId ||
       provenance.canonicalPrivateCase?.sha256 !== pins.approvedDocuments.G4 ||

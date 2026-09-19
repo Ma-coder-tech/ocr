@@ -71,7 +71,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(sha256sum trusted-private-ci/scripts/private-corpus-ci-gate.mjs | cut -d' ' -f1)" = "dd984dd0fd246ce4afb10fe16974513f19c21672b3f5a116991cd9f114582e24"
-          test "$(sha256sum trusted-private-ci/scripts/private-corpus-ci-preflight.mjs | cut -d' ' -f1)" = "c338ebca81d5b10f5d13f0eca8012b7f326b161454781fc7836d7270729593eb"
+          test "$(sha256sum trusted-private-ci/scripts/private-corpus-ci-preflight.mjs | cut -d' ' -f1)" = "f26a22053e7041cded7c4b32c05885540e5bd6a12b43ff878aadc91f214fad0c"
           test "$(sha256sum trusted-private-ci/scripts/private-corpus-ci-gcp.mjs | cut -d' ' -f1)" = "352505f50141a1fdccf911dcf4cd0bd669df528abd33b57e3f2a5f0e347e1f5e"
           test "$(sha256sum trusted-private-ci/scripts/private-corpus-ci-results.mjs | cut -d' ' -f1)" = "37e3c753b0179227c4249121dfa60159501c91613739cf57719e3472e26c1c77"
           test "$(sha256sum trusted-private-ci/config/private-corpus-ci-pins.json | cut -d' ' -f1)" = "b57e0175e076b5276380083535a2dfbb61d893cce7d717527e83242fe7fbb928"

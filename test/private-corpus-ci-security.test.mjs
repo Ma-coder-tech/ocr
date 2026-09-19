@@ -6,7 +6,7 @@ import path from "node:path";
 import test from "node:test";
 import { assessEvent, validateApproval, validateIdentity, REPOSITORY, REPOSITORY_ID, OWNER_ID } from "../scripts/private-corpus-ci-gate.mjs";
 import { cleanupPackage, runnerPaths, sha256, stagePackage, validatePins, verifyPackage } from "../scripts/private-corpus-ci-preflight.mjs";
-import { validateCloudConfiguration, verifyOidcClaims } from "../scripts/private-corpus-ci-gcp.mjs";
+import { downloadApprovedPackage, validateCloudConfiguration, verifyOidcClaims } from "../scripts/private-corpus-ci-gcp.mjs";
 import { validateResults } from "../scripts/private-corpus-ci-results.mjs";
 
 const CASES = ["G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8"];
@@ -121,6 +121,11 @@ test("changed provenance record is rejected", () => {
   const sample = fixture(({ provenance }) => { provenance.historicalG9.sourceStatus = "available"; });
   sample.pins.productProvenanceSha256 = original.pins.productProvenanceSha256;
   fails(sample, /source_digest_mismatch/);
+});
+
+test("even a newly pinned provenance record must cover each case once", () => {
+  const sample = fixture(({ provenance }) => { provenance.goldBindings[7] = { ...provenance.goldBindings[0] }; });
+  fails(sample, /product_provenance_invalid/);
 });
 
 test("missing, duplicate, unexpected and G9 Gold cases fail", () => {
@@ -271,6 +276,30 @@ test("denied OIDC/cloud configuration and mismatched called workflow fail", () =
   assert.throws(() => verifyOidcClaims({ repository: REPOSITORY, repository_id: REPOSITORY_ID,
     repository_owner_id: OWNER_ID, job_workflow_ref: "attacker-workflow", job_workflow_sha: env.CI_TRUSTED_WORKFLOW_SHA,
     sub: `repo:${REPOSITORY}:environment:ratereveal-private-corpus`, event_name: "pull_request", aud: env.RATEREVEAL_GCP_WIF_AUDIENCE }, env), /oidc_identity_denied/);
+});
+
+test("denied OIDC and cloud exchange fail without leaving an archive", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ratereveal-synthetic-ci-"));
+  const originalFetch = globalThis.fetch;
+  try {
+    const sample = fixture(); const pinsPath = path.join(root, "pins.json");
+    await fs.writeFile(pinsPath, JSON.stringify(sample.pins));
+    const env = { RUNNER_TEMP: root, CI_APPROVED_PACKAGE_VERSION: "synthetic-v1",
+      RATEREVEAL_GCP_WIF_AUDIENCE: "//iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/pool/providers/provider",
+      RATEREVEAL_GCP_BUCKET: "approved-bucket", CI_TRUSTED_WORKFLOW_SHA: "c".repeat(40),
+      ACTIONS_ID_TOKEN_REQUEST_URL: "https://pipelines.actions.githubusercontent.com/token",
+      ACTIONS_ID_TOKEN_REQUEST_TOKEN: "synthetic" };
+    globalThis.fetch = async () => ({ ok: false });
+    await assert.rejects(downloadApprovedPackage({ env, pinsPath }), /oidc_unavailable/);
+    const claims = { repository: REPOSITORY, repository_id: REPOSITORY_ID, repository_owner_id: OWNER_ID,
+      job_workflow_ref: `${REPOSITORY}/.github/workflows/private-corpus-trusted.yml@${env.CI_TRUSTED_WORKFLOW_SHA}`,
+      job_workflow_sha: env.CI_TRUSTED_WORKFLOW_SHA, sub: `repo:${REPOSITORY}:environment:ratereveal-private-corpus`,
+      event_name: "pull_request", aud: env.RATEREVEAL_GCP_WIF_AUDIENCE };
+    const jwt = `e30.${Buffer.from(JSON.stringify(claims)).toString("base64url")}.signature`;
+    globalThis.fetch = async (url) => String(url).includes("sts.googleapis.com") ? { ok: false } : { ok: true, json: async () => ({ value: jwt }) };
+    await assert.rejects(downloadApprovedPackage({ env, pinsPath }), /cloud_access_denied/);
+    await assert.rejects(fs.stat(runnerPaths(root).archive));
+  } finally { globalThis.fetch = originalFetch; await fs.rm(root, { recursive: true, force: true }); }
 });
 
 test("validator failure and policy waiver/non-applicability remain failures", () => {
