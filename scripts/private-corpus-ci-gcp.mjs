@@ -99,7 +99,8 @@ export async function downloadApprovedPackage({ env = process.env, pinsPath }) {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try { console.log(JSON.stringify(await downloadApprovedPackage({ pinsPath: process.argv[2] }))); }
   catch (error) {
-    console.error(JSON.stringify({ status: "failed", code: error instanceof Error ? error.message : "unknown_failure" }));
+    const code = error instanceof Error && /^[a-z][a-z0-9_]{0,60}$/.test(error.message) ? error.message : "cloud_access_failed";
+    console.error(JSON.stringify({ status: "failed", code }));
     process.exitCode = 1;
   }
 }

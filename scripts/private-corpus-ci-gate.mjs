@@ -133,7 +133,8 @@ export async function runGate({ mode, env = process.env }) {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try { console.log(JSON.stringify(await runGate({ mode: process.argv[2] }))); }
   catch (error) {
-    console.error(JSON.stringify({ status: "denied", code: error instanceof Error ? error.message : "unknown_failure" }));
+    const code = error instanceof Error && /^[a-z][a-z0-9_]{0,60}$/.test(error.message) ? error.message : "gate_failed";
+    console.error(JSON.stringify({ status: "denied", code }));
     process.exitCode = 1;
   }
 }

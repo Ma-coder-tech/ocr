@@ -31,7 +31,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(sha256sum trusted-private-ci/scripts/private-corpus-ci-gate.mjs | cut -d' ' -f1)" = "dad618afc429c8cb119b0e480118d5b37e0f6f1fa49a35bad1af23d1998eeaac"
+          test "$(sha256sum trusted-private-ci/scripts/private-corpus-ci-gate.mjs | cut -d' ' -f1)" = "dd984dd0fd246ce4afb10fe16974513f19c21672b3f5a116991cd9f114582e24"
+      - name: Run synthetic security regressions without corpus access
+        run: node --test trusted-private-ci/test/private-corpus-ci-security.test.mjs
       - name: Classify and authorize from authoritative GitHub event
         id: gate
         env:
@@ -68,10 +70,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(sha256sum trusted-private-ci/scripts/private-corpus-ci-gate.mjs | cut -d' ' -f1)" = "dad618afc429c8cb119b0e480118d5b37e0f6f1fa49a35bad1af23d1998eeaac"
-          test "$(sha256sum trusted-private-ci/scripts/private-corpus-ci-preflight.mjs | cut -d' ' -f1)" = "c0c3c6baf9e6f4043b53ace0a2602ffef94228463468f627e577bb4fa30364ab"
-          test "$(sha256sum trusted-private-ci/scripts/private-corpus-ci-gcp.mjs | cut -d' ' -f1)" = "fe4c45934aa6ab898b6abc3f9bcebf8fb246dc59eea6874cd6a5222a2d7c1bc3"
-          test "$(sha256sum trusted-private-ci/scripts/private-corpus-ci-results.mjs | cut -d' ' -f1)" = "8ba999acf21d313d2e0418ef1dad6f43abf26e4bde4af54ec165701fc6204bd5"
+          test "$(sha256sum trusted-private-ci/scripts/private-corpus-ci-gate.mjs | cut -d' ' -f1)" = "dd984dd0fd246ce4afb10fe16974513f19c21672b3f5a116991cd9f114582e24"
+          test "$(sha256sum trusted-private-ci/scripts/private-corpus-ci-preflight.mjs | cut -d' ' -f1)" = "c338ebca81d5b10f5d13f0eca8012b7f326b161454781fc7836d7270729593eb"
+          test "$(sha256sum trusted-private-ci/scripts/private-corpus-ci-gcp.mjs | cut -d' ' -f1)" = "352505f50141a1fdccf911dcf4cd0bd669df528abd33b57e3f2a5f0e347e1f5e"
+          test "$(sha256sum trusted-private-ci/scripts/private-corpus-ci-results.mjs | cut -d' ' -f1)" = "37e3c753b0179227c4249121dfa60159501c91613739cf57719e3472e26c1c77"
           test "$(sha256sum trusted-private-ci/config/private-corpus-ci-pins.json | cut -d' ' -f1)" = "b57e0175e076b5276380083535a2dfbb61d893cce7d717527e83242fe7fbb928"
       - name: Recheck live PR and exact Product approval
         env:

@@ -180,6 +180,19 @@ jobs:
       - run: npm run ci:dependency-delta
       - run: npm run repo:clean-check
 
+  private-corpus-security-synthetic:
+    name: private-corpus-security-synthetic
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: node --test test/private-corpus-ci-security.test.mjs
+      - run: npm run repo:clean-check
+
   private-corpus-policy:
     name: private-corpus-policy
     permissions:

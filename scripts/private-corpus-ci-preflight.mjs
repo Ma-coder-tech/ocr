@@ -195,7 +195,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
       console.log(JSON.stringify({ status: "cleaned" }));
     } else reject("command_invalid");
   } catch (error) {
-    console.error(JSON.stringify({ status: "failed", code: error instanceof Error ? error.message : "unknown_failure" }));
+    const code = error instanceof Error && /^[a-z][a-z0-9_]{0,60}$/.test(error.message) ? error.message : "preflight_failed";
+    console.error(JSON.stringify({ status: "failed", code }));
     process.exitCode = 1;
   }
 }

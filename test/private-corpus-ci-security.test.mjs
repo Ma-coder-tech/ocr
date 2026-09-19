@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -90,6 +91,9 @@ test("trusted workflow pins every executable security tool and contains no artif
   assert.ok(!/pull_request_target|workflow_run|upload-artifact|cache:\s*npm/i.test(workflow));
   const productionPins = JSON.parse(await fs.readFile(path.join(root, "config/private-corpus-ci-pins.json"), "utf8"));
   assert.throws(() => validatePins(productionPins), /package_identity_unconfigured/);
+  const caller = await fs.readFile(path.join(root, ".github/workflows/ci.yml"), "utf8");
+  assert.match(caller, /private-corpus-trusted\.yml@[a-f0-9]{40}/);
+  assert.ok(!caller.includes("RATEREVEAL_PRIVATE_CORPUS_WAIVER_ID"));
 });
 
 test("missing real package pin fails closed", () => {
@@ -209,6 +213,20 @@ test("missing corpus package fails closed and leaves no material", async () => {
     await assert.rejects(stagePackage({ runnerTemp: root, pinsPath }));
     await cleanupPackage(root);
     await assert.rejects(fs.stat(paths.corpus));
+  } finally { await fs.rm(root, { recursive: true, force: true }); }
+});
+
+test("CLI failure output never prints runner-local corpus paths", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ratereveal-synthetic-ci-"));
+  try {
+    const sample = fixture(); const pinsPath = path.join(root, "pins.json");
+    await fs.writeFile(pinsPath, JSON.stringify(sample.pins));
+    const result = spawnSync(process.execPath, [path.resolve(import.meta.dirname, "../scripts/private-corpus-ci-preflight.mjs"), "verify", pinsPath], {
+      env: { ...process.env, RUNNER_TEMP: root }, encoding: "utf8",
+    });
+    assert.notEqual(result.status, 0);
+    assert.ok(!result.stderr.includes(root));
+    assert.equal(JSON.parse(result.stderr).code, "preflight_failed");
   } finally { await fs.rm(root, { recursive: true, force: true }); }
 });
 
