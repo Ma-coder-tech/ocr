@@ -1,6 +1,6 @@
 # F2 — Dimension Authority, Completeness and Policy Evaluator
 
-Status: local, shadow-only implementation for Product review. F3 is not implemented. The frozen Authority & Derivability register remains semantic authority; this document describes executable mechanics, not a new policy decision.
+Status: shadow-only implementation. F3 now exists as a separate pinned public-authority interface; F2's test-only attestation input and authority decisions are unchanged. The frozen Authority & Derivability register remains semantic authority; this document describes executable mechanics, not a new policy decision.
 
 ## Boundary and data flow
 
