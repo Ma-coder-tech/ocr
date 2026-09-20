@@ -35,7 +35,6 @@
     "ci:cleanliness": "node scripts/check-toolchain.mjs && node scripts/run-ci-cleanliness.mjs",
     "ci:cleanliness:generated": "node scripts/check-toolchain.mjs && node scripts/run-ci-cleanliness.mjs --generated-only",
     "ci:dependency-delta": "node scripts/check-dependency-advisory-delta.mjs",
-    "ci:private-corpus-policy": "node scripts/check-private-corpus-policy.mjs",
     "bakeoff:pdf": "npm run build && node scripts/pdf-bakeoff.mjs",
     "bakeoff:azure": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/azure-layout-bakeoff.ts",
     "bakeoff:document-ir": "node scripts/check-toolchain.mjs && node scripts/run-node-tool.mjs --import tsx scripts/document-ir-bakeoff.ts",
