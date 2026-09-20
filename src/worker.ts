@@ -216,6 +216,28 @@ export async function processJob(jobId: string): Promise<void> {
       confidence: summary.confidence,
     });
 
+    // Internal-only cutover. The adapter owns the F4 decision; legacy summary,
+    // opportunity, persistence, and customer report paths do not consume it.
+    if (process.env.RATEREVEAL_OBSERVED_FEE_COMPONENT_INTERNAL_ENABLED === "true") {
+      try {
+        const { buildCanonicalRuntimeAnalysis } = await import("./canonical/runtimeAdapter.js");
+        const internal = buildCanonicalRuntimeAnalysis({
+          document: parsed,
+          businessType: job.businessType,
+          runtimeDocumentRef: `job_${job.id}`,
+        }).internalObservedFeeComponents;
+        console.log(`[job:${jobId}] observed-fee-component-internal`, {
+          status: internal.status,
+          supportedCount: internal.rows.filter((row) => row.status === "supported").length,
+          unknownCount: internal.rows.filter((row) => row.status === "unknown").length,
+          legacyComparison: internal.legacyComparison,
+        });
+      } catch {
+        // Internal semantic unavailability cannot affect the existing job result.
+        console.warn(`[job:${jobId}] observed-fee-component-internal`, { status: "unavailable" });
+      }
+    }
+
     if (summary.totalVolume <= 0) {
       failJob(jobId, "We could not find your total processing volume.");
       return;

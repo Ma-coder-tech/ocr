@@ -5,6 +5,7 @@ import { parsePdf, type ParsedDocument } from "../src/parser.js";
 import type { BusinessTypeId } from "../src/businessTypes.js";
 import { buildCanonicalStatementFactsFromParsedDocument } from "../src/canonical/buildCanonicalFacts.js";
 import { evaluateF4Shadow, type F4LegacyComparison, type F4ShadowDecision } from "../src/claimAuthorityF4/shadow.js";
+import { consumeInternalFeeSemantics } from "../src/claimAuthorityF4/observedFeeComponentConsumer.js";
 
 // These are existing repository observations, not authenticated Gold source mappings.
 // Names stay local to the loader and never enter the privacy-safe result.
@@ -103,7 +104,28 @@ for (const fixture of fixtures) {
   const analysis = buildCanonicalStatementFactsFromParsedDocument(document, {
     sourceFileName: fixture.file, businessType: fixture.businessType,
   });
+  const canonicalBefore = JSON.stringify(analysis);
   const report = evaluateF4Shadow({ analysis });
+  const internalSemantics = consumeInternalFeeSemantics(analysis);
+  if (JSON.stringify(analysis) !== canonicalBefore)
+    throw new Error(`Internal F4 consumption changed canonical money or downstream state for ${fixture.caseId}`);
+  const internal = internalSemantics.observedFeeComponents;
+  const internalMarkup = internalSemantics.processorMarkup;
+  if (internal.status !== "available" || internal.legacyComparison.excludedAndSupported !== 0
+    || internal.rows.some((row) => row.status !== report.decisions.find((decision) =>
+      decision.feeRowId === row.feeRowId && decision.semanticCode === "merchant_facing_fee_component")?.status))
+    throw new Error(`Internal observed fee-component consumer diverged for ${fixture.caseId}`);
+  const selectedMarkup = analysis.feeOwnershipActionability.rowClassifications
+    .filter((item) => item.selected.category === "processor_markup");
+  if (internalMarkup.status !== "available" || internalMarkup.comparison.legacySelected !== selectedMarkup.length
+    || internalMarkup.rows.some((row) => {
+      const decisions = report.decisions.filter((decision) => decision.feeRowId === row.feeRowId
+        && decision.semanticCode === "processor_markup" && decision.dimension === "economic_broad_category");
+      return decisions.length !== 1 || row.status !== decisions[0].status
+        || row.legacyCandidateId !== selectedMarkup.find((item) => item.feeRowId === row.feeRowId)?.selected.candidateId;
+    })) throw new Error(`Internal processor-markup authority diverged for ${fixture.caseId}`);
+  if (internalMarkup.comparison.supported !== 0 || internalMarkup.comparison.unknown !== 0)
+    throw new Error(`Unexpected positive or unknown processor-markup authority for ${fixture.caseId}`);
   if (report.publicProbe !== null || report.decisions.some((item) => item.status === "supported"
     && item.semanticCode !== "merchant_facing_fee_component"))
     throw new Error(`F4 Gold calibration produced an out-of-scope positive claim for ${fixture.caseId}`);
@@ -138,6 +160,7 @@ for (const fixture of fixtures) {
       comparisonBasis: readiness.comparisonBasis, relation: readiness.relation },
     componentSupportedByRole: Object.fromEntries(Object.entries(componentSupportedByRole).sort(([a], [b]) => a.localeCompare(b))),
     componentUnknownByRole: Object.fromEntries(Object.entries(componentUnknownByRole).sort(([a], [b]) => a.localeCompare(b))),
+    internalMarkup: internalMarkup.comparison,
     completeness: {
       savingsMissingStatementTotal: report.decisions.filter((item) => item.dimension === "savings" && item.missingGates.includes("statement_total")).length,
       savingsMissingFeeComposition: report.decisions.filter((item) => item.dimension === "savings" && item.missingGates.includes("fee_composition")).length,
@@ -149,14 +172,20 @@ for (const fixture of fixtures) {
 }
 
 const totals = { exact: {} as Count, proxy: {} as Count };
+const internalMarkupTotals = { legacySelected: 0, supported: 0, refused: 0, unknown: 0 };
 for (const item of cases) {
   for (const basis of ["exact", "proxy"] as const) {
     for (const [relation, count] of Object.entries(item.comparisons[basis]))
       totals[basis][relation] = (totals[basis][relation] ?? 0) + count;
   }
+  for (const key of ["legacySelected", "supported", "refused", "unknown"] as const)
+    internalMarkupTotals[key] += item.internalMarkup[key];
 }
 for (const basis of ["exact", "proxy"] as const)
   totals[basis] = Object.fromEntries(Object.entries(totals[basis]).sort(([a], [b]) => a.localeCompare(b)));
+if (internalMarkupTotals.legacySelected !== 24 || internalMarkupTotals.refused !== 24
+  || internalMarkupTotals.supported !== 0 || internalMarkupTotals.unknown !== 0)
+  throw new Error("F4 provisional calibration processor-markup refusal count changed");
 
 const result = {
   schemaVersion: "f4_gold_shadow_calibration_v1",
@@ -168,6 +197,6 @@ const result = {
     { caseId: "G6", reason: "exact_source_identity_and_mapping_unresolved" },
     { caseId: "G9", reason: "original_gold_source_unavailable" },
   ],
-  totals, cases,
+  totals, internalMarkupTotals, cases,
 };
 process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);

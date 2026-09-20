@@ -6,6 +6,11 @@ import { buildCanonicalFeeOwnershipActionability } from "../src/canonical/feeOwn
 import { buildCanonicalFeeLedger } from "../src/canonical/feeLedger.js";
 import type { CanonicalStatementAnalysis } from "../src/canonical/types.js";
 import { buildF4DecisionGraph, evaluateF4Shadow, tryEvaluateF4Shadow } from "../src/claimAuthorityF4/shadow.js";
+import {
+  consumeInternalFeeSemantics,
+  consumeObservedFeeComponents,
+  processorMarkupStatusFromF4,
+} from "../src/claimAuthorityF4/observedFeeComponentConsumer.js";
 import { createF3PublicSnapshot } from "../src/claimAuthorityF3/snapshot.js";
 import type { F3PublicSnapshot } from "../src/claimAuthorityF3/types.js";
 import type { ParsedDocument } from "../src/parser.js";
@@ -61,6 +66,90 @@ function setPeriod(analysis: CanonicalStatementAnalysis, start: string, end: str
 }
 
 describe("F4 shadow migration", () => {
+  it("retires a legacy Package D markup positive only at the internal semantic read boundary", () => {
+    const analysis = fixture();
+    const before = JSON.stringify(analysis);
+    const row = analysis.feeLedger.rows[0];
+    const amount = structuredClone(row.selectedAmount);
+    const contribution = structuredClone(row.contributionDecision);
+    const totalFees = structuredClone(analysis.financialFacts.totalFees);
+    const ledgerTotal = structuredClone(analysis.feeLedger.uniqueChargeTotal);
+    const controls = structuredClone(analysis.feeLedger.controls);
+    const internal = consumeInternalFeeSemantics(analysis);
+
+    expect(internal.processorMarkup).toMatchObject({
+      standing: "internal_only", semanticAuthority: "claim_authority_f4", status: "available",
+      comparison: { legacySelected: 1, supported: 0, refused: 1, unknown: 0 },
+      rows: [{ feeRowId: row.id, legacySelectedCategory: "processor_markup", status: "refused" }],
+    });
+    expect(internal.processorMarkup.rows[0].legacyCandidateId)
+      .toBe(analysis.feeOwnershipActionability.rowClassifications[0].selected.candidateId);
+    expect(internal.observedFeeComponents.rows).toMatchObject([{ feeRowId: row.id, status: "supported" }]);
+    expect(row.selectedAmount).toEqual(amount);
+    expect(row.contributionDecision).toEqual(contribution);
+    expect(analysis.financialFacts.totalFees).toEqual(totalFees);
+    expect(analysis.feeLedger.uniqueChargeTotal).toEqual(ledgerTotal);
+    expect(analysis.feeLedger.controls).toEqual(controls);
+    expect(JSON.stringify(analysis)).toBe(before);
+
+    analysis.validation.status = "invalid";
+    expect(consumeInternalFeeSemantics(analysis).processorMarkup).toMatchObject({
+      status: "unavailable", comparison: { supported: 0, refused: 0, unknown: 1 },
+      rows: [{ feeRowId: row.id, status: "unknown" }],
+    });
+  });
+
+  it("requires the F4 markup claim and independent authority lanes for positive internal status", () => {
+    const actual = decision(fixture(), ":markup");
+    expect(processorMarkupStatusFromF4(actual).status).toBe("refused");
+    expect(processorMarkupStatusFromF4(undefined).status).toBe("unknown");
+    const claimedSupport = {
+      ...actual,
+      status: "supported" as const,
+      reasonCodes: ["frozen_rule_requirements_met"],
+      missingGates: [],
+      missingFacets: [],
+    };
+    expect(processorMarkupStatusFromF4(claimedSupport).status).toBe("unknown");
+    const withIndependentAuthority = {
+      ...claimedSupport,
+      satisfiedLanes: [...claimedSupport.satisfiedLanes, "governed_network_regulator" as const],
+    };
+    expect(processorMarkupStatusFromF4(withIndependentAuthority).status).toBe("supported");
+    expect(processorMarkupStatusFromF4({ ...withIndependentAuthority, f1ClaimId: null }).status).toBe("unknown");
+    expect(processorMarkupStatusFromF4({ ...withIndependentAuthority, missingGates: ["comparison"] }).status).toBe("unknown");
+    expect(processorMarkupStatusFromF4({ ...withIndependentAuthority, missingFacets: ["compatible_underlying_cost_or_merchant_private_processor_control"] }).status).toBe("unknown");
+  });
+
+  it("consumes only supported observed fee components as internal semantic state", () => {
+    const analysis = fixture();
+    const row = analysis.feeLedger.rows[0];
+    const before = JSON.stringify(analysis);
+    const first = consumeObservedFeeComponents(analysis);
+    expect(first).toMatchObject({
+      standing: "internal_only", status: "available",
+      rows: [{ feeRowId: row.id, status: "supported" }],
+      legacyComparison: { includedAndSupported: 1, excludedAndSupported: 0 },
+    });
+    expect(first.rows[0].claimId).toBeTruthy();
+    expect(JSON.stringify(analysis)).toBe(before);
+
+    row.selectedAmount!.amountMinor = 0;
+    expect(consumeObservedFeeComponents(analysis).rows[0].status).toBe("unknown");
+    row.selectedAmount!.amountMinor = 100;
+    row.contributesToUniqueTotal = false;
+    expect(consumeObservedFeeComponents(analysis).rows[0].status).toBe("unknown");
+    row.contributesToUniqueTotal = true;
+    analysis.feeLedger.sourceOccurrences[0].pageNumber = null;
+    expect(consumeObservedFeeComponents(analysis).rows[0].status).toBe("unknown");
+
+    const invalid = fixture();
+    invalid.validation.status = "invalid";
+    expect(consumeObservedFeeComponents(invalid)).toMatchObject({
+      status: "unavailable", rows: [{ status: "unknown" }],
+    });
+  });
+
   it("keeps an observed broad component while refusing label-based processor markup and private conclusions", () => {
     const analysis = fixture();
     const row = analysis.feeLedger.rows[0];

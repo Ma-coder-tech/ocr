@@ -55,6 +55,18 @@ describe("canonical runtime adapter", () => {
     expect(result.analysis.opportunityEngine.summary.totalEligibleAnnualAmount).toEqual({ amountMinor: 0, currency: "USD" });
     expect(result.analysis.opportunityEngine.summary.masterSavingsAnnualAmount).toEqual({ amountMinor: 0, currency: "USD" });
     expect(JSON.stringify(result.analysis)).not.toContain("9999");
+    expect(result.internalObservedFeeComponents).toMatchObject({
+      standing: "internal_only",
+      status: "available",
+      legacyComparison: { excludedAndSupported: 0 },
+    });
+    expect(result.internalProcessorMarkupSemantics).toMatchObject({
+      standing: "internal_only",
+      semanticAuthority: "claim_authority_f4",
+      status: "available",
+    });
+    expect(JSON.stringify(result.analysis)).not.toContain("internalObservedFeeComponents");
+    expect(JSON.stringify(result.analysis)).not.toContain("internalProcessorMarkupSemantics");
   });
 
   it("does not use filenames, paths, or malformed refs as canonical runtime identity", () => {
