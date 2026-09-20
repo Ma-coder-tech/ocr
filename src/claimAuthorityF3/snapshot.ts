@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { ruleFor } from "../claimAuthorityF2/rules.js";
-import { F3_SNAPSHOT_VERSION, type F3Period, type F3PublicAssertion, type F3PublicDimension, type F3PublicSnapshot } from "./types.js";
+import { F3_SNAPSHOT_VERSION, type F3Period, type F3PublicAssertion, type F3PublicDimension, type F3PublicSnapshot, type F3Validity } from "./types.js";
 
 const publicDimensions: F3PublicDimension[] = ["official_normalized_identity", "reference_comparison", "benchmark", "recurrence", "cadence"];
 const publicLanes = ["governed_network_regulator", "governed_processor_acquirer_publication", "governed_public_mixed"];
@@ -26,6 +26,15 @@ function instant(value: unknown): value is string {
 export function validateF3Period(value: F3Period): void {
   keys(value, ["start", "end"], "period");
   check(day(value.start) && day(value.end) && value.start <= value.end, "invalid inclusive effective dates");
+}
+function validateF3Validity(value: F3Validity): void {
+  keys(value, ["state", "start", "end"], "validity");
+  check(day(value.start), "invalid effective-from date");
+  if (value.state === "explicit_bounded") {
+    check(day(value.end) && value.start <= value.end, "invalid inclusive effective dates");
+  } else {
+    check(value.state === "unresolved_end" && value.end === null, "invalid unresolved effective end");
+  }
 }
 function sortedUnique<T extends string>(values: T[]): T[] { return [...new Set(values)].sort(); }
 function lexical(a: string, b: string): number { return a < b ? -1 : a > b ? 1 : 0; }
@@ -56,7 +65,7 @@ function validateAssertion(assertion: F3PublicAssertion, recordedAt: string): vo
     && assertion.source.publishedOn <= assertion.source.retrievedAt.slice(0, 10)
     && assertion.source.retrievedAt <= assertion.admission.admittedAt
     && assertion.admission.admittedAt <= recordedAt, "invalid admission chronology");
-  validateF3Period(assertion.validPeriod);
+  validateF3Validity(assertion.validPeriod);
   keys(assertion.scope, ["geography", "network", "program", "feeIdentity", "population", "basis", "unit"], "scope");
   check(nonempty(assertion.scope.geography) && (assertion.scope.network === null || nonempty(assertion.scope.network))
     && (assertion.scope.program === null || nonempty(assertion.scope.program)) && nonempty(assertion.scope.feeIdentity)

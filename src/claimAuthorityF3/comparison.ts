@@ -8,7 +8,7 @@ export type F3ReferenceComparison = {
   standing: "shadow_only_narrow_reference_comparison";
   resolution: F3PublicResolution;
   status: "equal_within_tolerance" | "above_reference" | "below_reference" | "unknown" | "conflict" | "refused";
-  reasonCode: "comparison_complete" | "reference_missing" | "reference_period_not_covered" | "reference_conflict" | "claim_not_reference_comparison" | "observed_rate_unavailable" | "reference_not_rate";
+  reasonCode: "comparison_complete" | "reference_missing" | "reference_period_not_covered" | "reference_effective_end_unresolved" | "reference_conflict" | "claim_not_reference_comparison" | "observed_rate_unavailable" | "reference_not_rate";
   observedRate: string | null;
   referenceRate: string | null;
   difference: string | null;
@@ -58,6 +58,7 @@ export function compareAdmittedPublicRate(input: F3PublicQuery & {
     || !["observed_rate_matches_admitted_reference", "observed_rate_exceeds_admitted_reference", "observed_rate_below_admitted_reference"].includes(claim.semanticCode)
     || JSON.stringify(claim.subject) !== JSON.stringify(input.observedCanonicalRef)) return finish("refused", "claim_not_reference_comparison");
   if (resolution.status === "conflict") return finish("conflict", "reference_conflict");
+  if (resolution.reasonCode === "effective_end_unresolved") return finish("unknown", "reference_effective_end_unresolved");
   if (resolution.reasonCode === "period_not_covered" || resolution.reasonCode === "publication_after_period_start") return finish("refused", "reference_period_not_covered");
   if (resolution.status !== "matched") return finish("unknown", "reference_missing");
   if (input.observedCanonicalRef.kind !== "fact" || input.observedCanonicalRef.path !== "financialFacts.processorStatedRate") return finish("unknown", "observed_rate_unavailable");
