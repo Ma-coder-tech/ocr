@@ -22,7 +22,7 @@ function assertion(overrides: Partial<F3PublicAssertion> = {}): F3PublicAssertio
     assertionId: "visa_assessment_2024", version: "1", lane: "governed_network_regulator",
     source: { documentId: "visa_schedule_apr_2024", sha256: "a".repeat(64), publisher: "Visa", publishedOn: "2024-03-01", retrievedAt: "2026-07-01T00:00:00.000Z" },
     admission: { reviewerId: "reviewer_1", decisionId: "admission_1", admittedAt: "2026-07-02T00:00:00.000Z" },
-    validPeriod: { start: "2024-04-01", end: "2024-12-31" }, scope,
+    validPeriod: { state: "explicit_bounded", start: "2024-04-01", end: "2024-12-31" }, scope,
     dimensions: ["reference_comparison"], value: { kind: "rate", decimal: "2.0740" },
     limitations: ["Published reference only; merchant contract and processor retention unknown."],
     conflictsWith: [], supersedes: [], ...overrides,
@@ -73,7 +73,8 @@ describe("F3 pinned external authority sidecar", () => {
     changed.assertions[0]!.value = { kind: "rate", decimal: "9.99" };
     expect(() => validateF3PublicSnapshot(changed)).toThrow(/digest mismatch/);
     expect(() => createF3PublicSnapshot("2026-07-01T00:00:00.000Z", [first])).toThrow(/admission chronology/);
-    expect(() => createF3PublicSnapshot(recordedAt, [assertion({ validPeriod: { start: "2024-02-30", end: "2024-12-31" } })])).toThrow(/effective dates/);
+    expect(() => createF3PublicSnapshot(recordedAt, [assertion({ validPeriod: { state: "explicit_bounded", start: "2024-02-30", end: "2024-12-31" } })])).toThrow(/effective/);
+    expect(() => createF3PublicSnapshot(recordedAt, [assertion({ validPeriod: { state: "unresolved_end", start: "2024-04-01", end: "2024-12-31" } as never })])).toThrow(/unresolved effective end/);
     expect(() => createF3PublicSnapshot(recordedAt, [assertion({ source: { ...first.source, sha256: "not_a_hash" } })])).toThrow(/source provenance/);
   });
 
@@ -85,7 +86,7 @@ describe("F3 pinned external authority sidecar", () => {
     const first = resolveAdmittedPublicClaims(query(admitted, ctx));
     expect(first).toMatchObject({ status: "matched", snapshotId: admitted.snapshotId, analysisPeriod: period });
     expect(first.selectedAssertions).toEqual([{ assertionId: "visa_assessment_2024", version: "1", sourceSha256: "a".repeat(64), admittedAt: "2026-07-02T00:00:00.000Z", validPeriod: assertion().validPeriod }]);
-    const later = createF3PublicSnapshot("2026-09-01T00:00:00.000Z", [assertion(), assertion({ assertionId: "later_2026_rate", validPeriod: { start: "2026-01-01", end: "2026-12-31" }, value: { kind: "rate", decimal: "3.0" }, source: { ...assertion().source, documentId: "later_doc", sha256: "c".repeat(64) } })]);
+    const later = createF3PublicSnapshot("2026-09-01T00:00:00.000Z", [assertion(), assertion({ assertionId: "later_2026_rate", validPeriod: { state: "explicit_bounded", start: "2026-01-01", end: "2026-12-31" }, value: { kind: "rate", decimal: "3.0" }, source: { ...assertion().source, documentId: "later_doc", sha256: "c".repeat(64) } })]);
     expect(resolveAdmittedPublicClaims(query(structuredClone(admitted), ctx))).toEqual(first);
     expect(resolveAdmittedPublicClaims(query(later, ctx)).selectedAssertions).toEqual(first.selectedAssertions);
     expect(() => resolveAdmittedPublicClaims({ ...query(admitted, ctx), snapshotId: later.snapshotId })).toThrow(/pin mismatch/);
@@ -93,9 +94,9 @@ describe("F3 pinned external authority sidecar", () => {
 
   it("refuses historical back-projection and keeps missing dimension, scope, and conflict explicit", () => {
     const ctx = context(["reference_comparison", "contractual_pass_through", "economic_broad_category"]);
-    const future = createF3PublicSnapshot(recordedAt, [assertion({ validPeriod: { start: "2025-01-01", end: "2026-12-31" } })]);
+    const future = createF3PublicSnapshot(recordedAt, [assertion({ validPeriod: { state: "explicit_bounded", start: "2025-01-01", end: "2026-12-31" } })]);
     expect(resolveAdmittedPublicClaims(query(future, ctx))).toMatchObject({ status: "refused", reasonCode: "period_not_covered", selectedAssertions: [] });
-    const partial = createF3PublicSnapshot(recordedAt, [assertion({ validPeriod: { start: "2024-04-15", end: "2024-12-31" } })]);
+    const partial = createF3PublicSnapshot(recordedAt, [assertion({ validPeriod: { state: "explicit_bounded", start: "2024-04-15", end: "2024-12-31" } })]);
     expect(resolveAdmittedPublicClaims(query(partial, ctx))).toMatchObject({ status: "refused", reasonCode: "period_not_covered" });
     const retroactive = createF3PublicSnapshot(recordedAt, [assertion({ source: { ...assertion().source, publishedOn: "2025-01-01" } })]);
     expect(resolveAdmittedPublicClaims(query(retroactive, ctx))).toMatchObject({ status: "refused", reasonCode: "publication_after_period_start" });
@@ -144,7 +145,12 @@ describe("F3 pinned external authority sidecar", () => {
     // Rebind to the updated canonical digest: the old graph cannot be replayed after mutation.
     expect(() => compareAdmittedPublicRate({ ...query(snapshot, ctx), observedCanonicalRef: observedRef })).toThrow(/canonical input\/version drift/);
     const rebound = context();
-    const future = createF3PublicSnapshot(recordedAt, [assertion({ validPeriod: { start: "2025-01-01", end: "2026-12-31" } })]);
+    const future = createF3PublicSnapshot(recordedAt, [assertion({ validPeriod: { state: "explicit_bounded", start: "2025-01-01", end: "2026-12-31" } })]);
     expect(compareAdmittedPublicRate({ ...query(future, rebound), observedCanonicalRef: observedRef })).toMatchObject({ status: "refused", reasonCode: "reference_period_not_covered" });
+    const unresolved = createF3PublicSnapshot(recordedAt, [assertion({ validPeriod: { state: "unresolved_end", start: "2024-04-01", end: null } })]);
+    expect(compareAdmittedPublicRate({ ...query(unresolved, rebound), observedCanonicalRef: observedRef })).toMatchObject({
+      status: "unknown", reasonCode: "reference_effective_end_unresolved", referenceRate: null, difference: null,
+      resolution: { status: "missing_authority", reasonCode: "effective_end_unresolved" },
+    });
   });
 });

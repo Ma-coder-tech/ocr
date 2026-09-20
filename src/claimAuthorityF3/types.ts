@@ -1,11 +1,16 @@
 import type { AuthorityLane, ClaimDimension, F1ClaimGraph } from "../claimAuthorityF1/types.js";
 
-export const F3_SNAPSHOT_VERSION = "claim_authority_public_snapshot_f3_v1" as const;
-export const F3_RESOLVER_VERSION = "claim_authority_public_resolver_f3_v1" as const;
-export const F3_COMPARISON_VERSION = "claim_authority_reference_comparison_f3_v1" as const;
-export const F3_AUTHORITY_POLICY_VERSION = "claim_authority_public_scope_f3_v1" as const;
+export const F3_SNAPSHOT_VERSION = "claim_authority_public_snapshot_f3_v2" as const;
+export const F3_RESOLVER_VERSION = "claim_authority_public_resolver_f3_v2" as const;
+export const F3_COMPARISON_VERSION = "claim_authority_reference_comparison_f3_v2" as const;
+export const F3_AUTHORITY_POLICY_VERSION = "claim_authority_public_scope_f3_v2" as const;
 
 export type F3Period = { start: string; end: string }; // Inclusive calendar dates.
+// Admission can preserve an effective start without asserting an unsupported end.
+// Only explicit_bounded can cover a bounded statement-period claim.
+export type F3Validity =
+  | { state: "explicit_bounded"; start: string; end: string }
+  | { state: "unresolved_end"; start: string; end: null };
 export type F3PublicLane = Extract<AuthorityLane, "governed_network_regulator" | "governed_processor_acquirer_publication" | "governed_public_mixed">;
 export type F3PublicDimension = Extract<ClaimDimension,
   "official_normalized_identity" | "reference_comparison" | "benchmark" | "recurrence" | "cadence">;
@@ -28,7 +33,7 @@ export type F3PublicAssertion = {
   lane: F3PublicLane;
   source: { documentId: string; sha256: string; publisher: string; publishedOn: string; retrievedAt: string };
   admission: { reviewerId: string; decisionId: string; admittedAt: string };
-  validPeriod: F3Period;
+  validPeriod: F3Validity;
   scope: F3PublicScope;
   dimensions: F3PublicDimension[];
   value: { kind: "rate"; decimal: string } | { kind: "semantic_code"; code: string };
@@ -56,8 +61,8 @@ export type F3PublicResolution = {
   dimension: ClaimDimension;
   analysisPeriod: F3Period | null;
   status: "matched" | "missing_authority" | "conflict" | "refused";
-  reasonCode: "admitted_match" | "no_admitted_assertion" | "dimension_not_authorized" | "scope_incompatible" | "period_not_covered" | "publication_after_period_start" | "conflicting_assertions" | "public_lane_forbidden" | "claim_period_missing";
-  selectedAssertions: { assertionId: string; version: string; sourceSha256: string; admittedAt: string; validPeriod: F3Period }[];
+  reasonCode: "admitted_match" | "no_admitted_assertion" | "dimension_not_authorized" | "scope_incompatible" | "period_not_covered" | "effective_end_unresolved" | "publication_after_period_start" | "conflicting_assertions" | "public_lane_forbidden" | "claim_period_missing";
+  selectedAssertions: { assertionId: string; version: string; sourceSha256: string; admittedAt: string; validPeriod: F3Validity }[];
   conflictingAssertionIds: string[];
 };
 

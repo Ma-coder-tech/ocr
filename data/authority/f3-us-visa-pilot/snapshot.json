@@ -1,0 +1,151 @@
+{
+  "schemaVersion": "claim_authority_public_snapshot_f3_v2",
+  "snapshotId": "f3_snapshot_952b92bcb298bdf74f2f70e98a2418ad31691873ee6e5c4229e90f157d5ee22f",
+  "recordedAt": "2026-09-20T17:07:32.753Z",
+  "assertions": [
+    {
+      "assertionId": "visa_us_credit_voucher_debit_2026_04_18",
+      "version": "visa_public_2026_04_18_captured_2026_09_20",
+      "lane": "governed_network_regulator",
+      "source": {
+        "documentId": "https://usa.visa.com/content/dam/VCOM/download/merchants/visa-usa-interchange-reimbursement-fees.pdf",
+        "sha256": "2c34e719746a8710e0f78342b9f435b637911f6ed072ae1b1728a06768b2b5bd",
+        "publisher": "Visa",
+        "publishedOn": "2026-09-07",
+        "retrievedAt": "2026-09-20T16:49:55.000Z"
+      },
+      "admission": {
+        "reviewerId": "product_authorized_f3_us_visa_pilot",
+        "decisionId": "f3_us_visa_benchmark_admission_2026_09_20",
+        "admittedAt": "2026-09-20T17:07:32.752Z"
+      },
+      "validPeriod": {
+        "state": "unresolved_end",
+        "start": "2026-04-18",
+        "end": null
+      },
+      "scope": {
+        "geography": "US_50_STATES_DC",
+        "network": "visa",
+        "program": "visa_usa_other_transactions_credit_voucher",
+        "feeIdentity": "visa_usa_credit_voucher_interchange_reimbursement",
+        "basis": "credit_voucher_transaction_value",
+        "unit": "decimal_fraction",
+        "population": "debit_credit_voucher"
+      },
+      "dimensions": [
+        "benchmark"
+      ],
+      "value": {
+        "kind": "rate",
+        "decimal": "0.0000"
+      },
+      "limitations": [
+        "Effective end is unresolved; admission does not establish coverage of any bounded statement period.",
+        "Exact published row: Credit Voucher — Debit: 0.00%.",
+        "Interchange reimbursement is not a Visa network assessment or a merchant-billed processor rate.",
+        "No merchant contract, pass-through, at-cost, markup, retained profit, removability, negotiability, avoidable cost, or savings conclusion.",
+        "Printed schedule date is 18 April 2026; the captured bytes were last modified on Visa's server 7 September 2026, so earlier availability of these exact bytes is unproven.",
+        "Visa U.S.A. Other Transactions table, printed page 20 (PDF page 23); benchmark only."
+      ],
+      "conflictsWith": [],
+      "supersedes": []
+    },
+    {
+      "assertionId": "visa_us_credit_voucher_mail_phone_ecommerce_consumer_credit_2026_04_18",
+      "version": "visa_public_2026_04_18_captured_2026_09_20",
+      "lane": "governed_network_regulator",
+      "source": {
+        "documentId": "https://usa.visa.com/content/dam/VCOM/download/merchants/visa-usa-interchange-reimbursement-fees.pdf",
+        "sha256": "2c34e719746a8710e0f78342b9f435b637911f6ed072ae1b1728a06768b2b5bd",
+        "publisher": "Visa",
+        "publishedOn": "2026-09-07",
+        "retrievedAt": "2026-09-20T16:49:55.000Z"
+      },
+      "admission": {
+        "reviewerId": "product_authorized_f3_us_visa_pilot",
+        "decisionId": "f3_us_visa_benchmark_admission_2026_09_20",
+        "admittedAt": "2026-09-20T17:07:32.752Z"
+      },
+      "validPeriod": {
+        "state": "unresolved_end",
+        "start": "2026-04-18",
+        "end": null
+      },
+      "scope": {
+        "geography": "US_50_STATES_DC",
+        "network": "visa",
+        "program": "visa_usa_other_transactions_credit_voucher",
+        "feeIdentity": "visa_usa_credit_voucher_interchange_reimbursement",
+        "basis": "credit_voucher_transaction_value",
+        "unit": "decimal_fraction",
+        "population": "mail_phone_order_ecommerce_consumer_credit_credit_voucher"
+      },
+      "dimensions": [
+        "benchmark"
+      ],
+      "value": {
+        "kind": "rate",
+        "decimal": "0.0205"
+      },
+      "limitations": [
+        "Effective end is unresolved; admission does not establish coverage of any bounded statement period.",
+        "Exact published row: Mail/Phone Order and eCommerce Merchants — Consumer Credit: 2.05%.",
+        "Interchange reimbursement is not a Visa network assessment or a merchant-billed processor rate.",
+        "No merchant contract, pass-through, at-cost, markup, retained profit, removability, negotiability, avoidable cost, or savings conclusion.",
+        "Printed schedule date is 18 April 2026; the captured bytes were last modified on Visa's server 7 September 2026, so earlier availability of these exact bytes is unproven.",
+        "Visa U.S.A. Other Transactions table, printed page 20 (PDF page 23); benchmark only."
+      ],
+      "conflictsWith": [],
+      "supersedes": []
+    },
+    {
+      "assertionId": "visa_us_credit_voucher_non_passenger_consumer_credit_2026_04_18",
+      "version": "visa_public_2026_04_18_captured_2026_09_20",
+      "lane": "governed_network_regulator",
+      "source": {
+        "documentId": "https://usa.visa.com/content/dam/VCOM/download/merchants/visa-usa-interchange-reimbursement-fees.pdf",
+        "sha256": "2c34e719746a8710e0f78342b9f435b637911f6ed072ae1b1728a06768b2b5bd",
+        "publisher": "Visa",
+        "publishedOn": "2026-09-07",
+        "retrievedAt": "2026-09-20T16:49:55.000Z"
+      },
+      "admission": {
+        "reviewerId": "product_authorized_f3_us_visa_pilot",
+        "decisionId": "f3_us_visa_benchmark_admission_2026_09_20",
+        "admittedAt": "2026-09-20T17:07:32.752Z"
+      },
+      "validPeriod": {
+        "state": "unresolved_end",
+        "start": "2026-04-18",
+        "end": null
+      },
+      "scope": {
+        "geography": "US_50_STATES_DC",
+        "network": "visa",
+        "program": "visa_usa_other_transactions_credit_voucher",
+        "feeIdentity": "visa_usa_credit_voucher_interchange_reimbursement",
+        "basis": "credit_voucher_transaction_value",
+        "unit": "decimal_fraction",
+        "population": "non_passenger_transport_consumer_credit_credit_voucher"
+      },
+      "dimensions": [
+        "benchmark"
+      ],
+      "value": {
+        "kind": "rate",
+        "decimal": "0.0176"
+      },
+      "limitations": [
+        "Effective end is unresolved; admission does not establish coverage of any bounded statement period.",
+        "Exact published row: Non-Passenger Transport — Consumer Credit: 1.76%.",
+        "Interchange reimbursement is not a Visa network assessment or a merchant-billed processor rate.",
+        "No merchant contract, pass-through, at-cost, markup, retained profit, removability, negotiability, avoidable cost, or savings conclusion.",
+        "Printed schedule date is 18 April 2026; the captured bytes were last modified on Visa's server 7 September 2026, so earlier availability of these exact bytes is unproven.",
+        "Visa U.S.A. Other Transactions table, printed page 20 (PDF page 23); benchmark only."
+      ],
+      "conflictsWith": [],
+      "supersedes": []
+    }
+  ]
+}

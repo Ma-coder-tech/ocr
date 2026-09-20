@@ -23,9 +23,6 @@ function sameScope(a: F3PublicScope, b: F3PublicScope): boolean {
   return a.geography === b.geography && a.network === b.network && a.program === b.program
     && a.feeIdentity === b.feeIdentity && a.population === b.population && a.basis === b.basis && a.unit === b.unit;
 }
-function covers(valid: F3Period, analysis: F3Period): boolean {
-  return valid.start <= analysis.start && valid.end >= analysis.end;
-}
 function freeze<T>(value: T): T {
   if (value && typeof value === "object" && !Object.isFrozen(value)) {
     for (const child of Object.values(value)) freeze(child);
@@ -59,17 +56,24 @@ export function resolveAdmittedPublicClaims(query: F3PublicQuery): F3PublicResol
   if (!byDimension.length) return result("missing_authority", "dimension_not_authorized");
   const byScope = byDimension.filter((assertion) => sameScope(assertion.scope, query.scope));
   if (!byScope.length) return result("missing_authority", "scope_incompatible");
-  const byPeriod = byScope.filter((assertion) => covers(assertion.validPeriod, period));
-  if (!byPeriod.length) return result("refused", "period_not_covered");
+  const byEffectiveStart = byScope.filter((assertion) => assertion.validPeriod.start <= period.start);
+  if (!byEffectiveStart.length) return result("refused", "period_not_covered");
   // A publication made after the statement period began cannot silently rewrite
   // the historical decision, even if it declares a retroactive valid interval.
-  const matches = byPeriod.filter((assertion) => assertion.source.publishedOn <= period.start);
-  if (!matches.length) return result("refused", "publication_after_period_start");
-  const values = new Set(matches.map((assertion) => assertion.value.kind === "rate" ? `rate:${assertion.value.decimal}` : `semantic:${assertion.value.code}`));
-  const ids = new Set(matches.map((assertion) => assertion.assertionId));
-  const explicitConflict = matches.some((assertion) => assertion.conflictsWith.some((id) => ids.has(id)));
-  if (values.size > 1 || explicitConflict) return result("conflict", "conflicting_assertions", [], matches.map((item) => item.assertionId).sort());
-  return result("matched", "admitted_match", matches.map((item) => ({
+  const published = byEffectiveStart.filter((assertion) => assertion.source.publishedOn <= period.start);
+  if (!published.length) return result("refused", "publication_after_period_start");
+  const bounded = published.filter((assertion) => assertion.validPeriod.state === "explicit_bounded" && assertion.validPeriod.end >= period.end);
+  const unresolved = published.filter((assertion) => assertion.validPeriod.state === "unresolved_end");
+  // Unresolved assertions can conflict with a bounded assertion, but cannot supply
+  // the missing end needed for period coverage. Order and supersedes never choose a winner.
+  const candidates = [...bounded, ...unresolved];
+  if (!candidates.length) return result("refused", "period_not_covered");
+  const values = new Set(candidates.map((assertion) => assertion.value.kind === "rate" ? `rate:${assertion.value.decimal}` : `semantic:${assertion.value.code}`));
+  const ids = new Set(candidates.map((assertion) => assertion.assertionId));
+  const explicitConflict = candidates.some((assertion) => assertion.conflictsWith.some((id) => ids.has(id)));
+  if (values.size > 1 || explicitConflict) return result("conflict", "conflicting_assertions", [], candidates.map((item) => item.assertionId).sort());
+  if (!bounded.length) return result("missing_authority", "effective_end_unresolved");
+  return result("matched", "admitted_match", bounded.map((item) => ({
     assertionId: item.assertionId, version: item.version, sourceSha256: item.source.sha256,
     admittedAt: item.admission.admittedAt, validPeriod: item.validPeriod,
   })));
