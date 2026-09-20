@@ -1,0 +1,138 @@
+{
+  "manifestVersion": "ratereveal_gold_authority_derivability_freeze_manifest_v1",
+  "frozenAt": "2026-09-19",
+  "deterministic": true,
+  "identities": {
+    "document": "RateReveal_Gold_Authority_Derivability_Contract_v1",
+    "contract": "ratereveal_gold_authority_derivability_contract_v1",
+    "schema": "ratereveal_gold_authority_derivability_schema_v1",
+    "register": "ratereveal_gold_authority_derivability_register_v1"
+  },
+  "repository": {
+    "branch": "codex/package-h1-4-canonical-report-preview",
+    "head": "3f9328bb4d2fc458f0e05715d0c45e7a78cf9b63"
+  },
+  "generation": {
+    "command": "node scripts/run-node-tool.mjs --import tsx scripts/gold-authority-derivability-generate.ts",
+    "node": "v22.20.0",
+    "networkCalls": false,
+    "sourceManifestAvailable": false,
+    "sourceManifestReason": "RATEREVEAL_PRIVATE_CORPUS_DIR was not configured; no provisional fixture was promoted."
+  },
+  "counts": {
+    "originalAssertions": 348,
+    "adjudicatedMixedAssertions": 49,
+    "decomposedOriginalAssertions": 21,
+    "reannotatedMixedAssertions": 28,
+    "normalizedAssertions": 369,
+    "productClarificationItems": 0,
+    "reasoningClass": {
+      "deterministic_calculation": 29,
+      "direct_observation": 108,
+      "economic_structural_inference": 60,
+      "governed_public_dependency": 18,
+      "merchant_private_dependency": 2,
+      "product_policy_judgment": 148,
+      "template_structural_inference": 4
+    },
+    "primaryAuthorityLane": {
+      "deterministic_arithmetic": 27,
+      "governed_network_regulator": 11,
+      "governed_processor_acquirer_publication": 1,
+      "governed_public_mixed": 6,
+      "merchant_private_contract_or_correspondence": 2,
+      "reviewed_product_policy": 148,
+      "statement_source_document": 103,
+      "statement_structural_evidence": 51,
+      "synthetic_falsification_input": 16,
+      "versioned_template_mapping": 4
+    },
+    "resolutionStatus": {
+      "refused": 36,
+      "source_mapping_incomplete": 287,
+      "source_unavailable": 26,
+      "supported": 18,
+      "unresolved": 2
+    },
+    "semanticResolutionStatus": {
+      "refused": 83,
+      "supported": 253,
+      "unresolved": 33
+    },
+    "sourceExecutionStatus": {
+      "not_source_executable": 287,
+      "product_policy_executable": 25,
+      "source_unavailable": 26,
+      "synthetic_executable": 31
+    },
+    "sourceIdentityStatus": {
+      "not_applicable_policy": 25,
+      "pending_authoritative_mapping": 249,
+      "source_unavailable": 26,
+      "synthetic": 31,
+      "unresolved_identity": 38
+    },
+    "sourceProvenanceStatus": {
+      "not_applicable_policy": 25,
+      "synthetic_authored": 31,
+      "unproven": 313
+    },
+    "evidenceMappingStatus": {
+      "not_applicable_global_policy": 25,
+      "not_applicable_synthetic": 31,
+      "pending_authoritative_mapping": 287,
+      "source_unavailable": 26
+    },
+    "semanticApprovalStatus": {
+      "product_owner_approved": 327,
+      "product_owner_approved_via_lineage": 42
+    },
+    "evaluationOutcome": {
+      "correct_answer": 18,
+      "correct_refusal": 38,
+      "missing_source_authority": 26,
+      "source_mapping_incomplete": 287
+    },
+    "semanticEvaluationOutcome": {
+      "correct_answer": 253,
+      "correct_refusal": 116
+    },
+    "canonicalConflictStatus": {
+      "current_behavior_stronger_than_gold": 7,
+      "current_numeric_or_precision_conflict": 3,
+      "none_known": 359
+    }
+  },
+  "hashes": {
+    "contractArtifacts": {
+      "artifacts/gold-contract/RateReveal_Gold_Authority_Derivability_Contract_v1.md": "1de21d9d3384ae60ffd10652f6b0c25efd4ef1ed94d4ced5ee93b01f6ce98aec",
+      "test/fixtures/gold-contract/gold-authority-derivability.schema.json": "060c81b13aa6bbbb3793d846ca74cc5c792d56165208eee9c525d6f1e5301a79",
+      "test/fixtures/gold-contract/gold-authority-derivability-v1.json": "6f2431bffcfc6d47acd8336b1a7d7fecbff7ebda45f24bec5f416b85deef86b3",
+      "artifacts/gold-contract/Gold_Authority_Derivability_Conflict_Report_v1.md": "78ab98b17365e2cb7487a58d8ef134cb07c0b3a016f6269a9dca84c345c88d3f"
+    },
+    "sourceInputs": {
+      "test/fixtures/gold-contract/gold-catalog-v0.3.final.json": "4767a77252fb80247558d64903c4bc0ed0528215da94d963882182b287616d2a",
+      "test/fixtures/gold-contract/gold-metadata-clarification-v0.1.json": "e7f333c5094b52a12c432e663dc2cdcb3fc4b9b299f079779f96387b8dc6ad08",
+      "test/fixtures/gold-contract/tolerance-rules.final.json": "9785d82f8a757e134c22e2dbc6fa7d8a8fd950dbb7377eb882a75545c2a5c8b8",
+      "test/fixtures/gold-contract/current-baseline.json": "31522e88d6de4914c3ab5eca0ef1dc415f1ad0f289136e4d6faa978aba68e7e7",
+      "scripts/gold-contract-lib.ts": "7944f8c6815a6929be13b5cbc9513c710607162798f671476a6ea8710856830b"
+    }
+  },
+  "freezeSemantics": {
+    "authorizes": [
+      "Future engineering specifications may use this frozen claim, reasoning, authority, provenance, and refusal contract.",
+      "Future Gold evaluations may measure each frozen evaluation outcome independently."
+    ],
+    "doesNotAuthorize": [
+      "Production parser, canonical classification, opportunity, report, or customer-output changes.",
+      "Phase 2 evidence admission or live research changes.",
+      "Private-document infrastructure or knowledge-corpus migration.",
+      "A universal fee taxonomy, completed source mappings, or source executability for G1-G9."
+    ]
+  },
+  "validation": {
+    "requiredCommand": "node scripts/run-node-tool.mjs --import tsx scripts/gold-authority-derivability-validate.ts",
+    "invariants": 20,
+    "manifestSelfHashExcluded": true
+  }
+}

@@ -11,7 +11,12 @@ data/uploads/*
 data/reports/*
 !data/uploads/.gitkeep
 !data/reports/.gitkeep
-artifacts/
+artifacts/*
+!artifacts/gold-contract/
+artifacts/gold-contract/*
+!artifacts/gold-contract/RateReveal_Gold_Authority_Derivability_Contract_v1.md
+!artifacts/gold-contract/Gold_Authority_Derivability_Conflict_Report_v1.md
+!artifacts/gold-contract/gold-authority-derivability-freeze-manifest-v1.json
 private-corpus/
 test/fixtures/canonical/private-originals/
 .aider*

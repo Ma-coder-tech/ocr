@@ -9,19 +9,18 @@ import {
   type CorpusCaseRunResult,
 } from "./canonical-corpus-lib.js";
 
+// This command is consumed as JSON by the private-corpus policy. Keep diagnostics
+// visible on stderr while reserving stdout for exactly one result document.
+console.log = (...args: unknown[]) => console.error(...args);
+
+function emitResult(value: unknown): void {
+  process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
+}
+
 const configured = privateCorpusDirectoryFromEnv();
 
 if (configured.status === "skipped") {
-  console.log(
-    JSON.stringify(
-      {
-        status: "skipped",
-        reason: configured.reason,
-      },
-      null,
-      2,
-    ),
-  );
+  emitResult({ status: "skipped", reason: configured.reason });
   process.exit(0);
 }
 
@@ -46,31 +45,25 @@ try {
     results.push(evaluateCorpusCase(corpusCase, actualValues));
   }
 
-  console.log(
-    JSON.stringify(
-      {
-        status: "configured",
-        privateCorpusCasesDiscovered: manifestCount,
-        publicPrivateCasesExpected: cases.length,
-        privateCasesExecuted: results.length,
-        missingManifestCount,
-        summary: summarize(results),
-        results: results.map((result) => ({
-          caseId: result.caseId,
-          outcome: result.outcome,
-          expectationOutcomes: result.expectationResults.map((expectation) => ({
-            field: expectation.field,
-            outcome: expectation.outcome,
-            defectId: expectation.defectId,
-            targetCorrectionPackage: expectation.targetCorrectionPackage,
-          })),
-        })),
-        note: "Private corpus paths, filenames, document hashes, and raw statement text are intentionally not printed.",
-      },
-      null,
-      2,
-    ),
-  );
+  emitResult({
+    status: "configured",
+    privateCorpusCasesDiscovered: manifestCount,
+    publicPrivateCasesExpected: cases.length,
+    privateCasesExecuted: results.length,
+    missingManifestCount,
+    summary: summarize(results),
+    results: results.map((result) => ({
+      caseId: result.caseId,
+      outcome: result.outcome,
+      expectationOutcomes: result.expectationResults.map((expectation) => ({
+        field: expectation.field,
+        outcome: expectation.outcome,
+        defectId: expectation.defectId,
+        targetCorrectionPackage: expectation.targetCorrectionPackage,
+      })),
+    })),
+    note: "Private corpus paths, filenames, document hashes, and raw statement text are intentionally not printed.",
+  });
 } catch (error) {
   console.error(
     JSON.stringify(
