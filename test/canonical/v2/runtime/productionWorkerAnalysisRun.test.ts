@@ -7,12 +7,14 @@ describe("production worker canonical AnalysisRun integration", () => {
   let dbModule: typeof import("../../../../src/db.js");
   const priorAnthropicKey = process.env.ANTHROPIC_API_KEY;
   const priorOpenAiKey = process.env.OPENAI_API_KEY;
+  const priorComponentFlag = process.env.RATEREVEAL_OBSERVED_FEE_COMPONENT_INTERNAL_ENABLED;
 
   beforeEach(() => {
     vi.resetModules();
     process.env.FEECLEAR_DB_PATH = ":memory:";
     delete process.env.ANTHROPIC_API_KEY;
     delete process.env.OPENAI_API_KEY;
+    process.env.RATEREVEAL_OBSERVED_FEE_COMPONENT_INTERNAL_ENABLED = "true";
   });
 
   afterEach(() => {
@@ -22,6 +24,9 @@ describe("production worker canonical AnalysisRun integration", () => {
     else process.env.ANTHROPIC_API_KEY = priorAnthropicKey;
     if (priorOpenAiKey === undefined) delete process.env.OPENAI_API_KEY;
     else process.env.OPENAI_API_KEY = priorOpenAiKey;
+    if (priorComponentFlag === undefined) delete process.env.RATEREVEAL_OBSERVED_FEE_COMPONENT_INTERNAL_ENABLED;
+    else process.env.RATEREVEAL_OBSERVED_FEE_COMPONENT_INTERNAL_ENABLED = priorComponentFlag;
+    vi.restoreAllMocks();
   });
 
   it("creates the durable V2 run on the normal job path without changing the legacy summary contract", async () => {
@@ -36,7 +41,16 @@ describe("production worker canonical AnalysisRun integration", () => {
     const job = store.createJob({ fileName: "customer-upload.pdf", filePath: fixture, fileType: "pdf",
       businessType: "retail", maxAttempts: 1 });
 
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
     await worker.processJob(job.id);
+    expect(log).toHaveBeenCalledWith(
+      expect.stringContaining("observed-fee-component-internal"),
+      expect.objectContaining({
+        status: "available",
+        supportedCount: expect.any(Number),
+        legacyComparison: expect.objectContaining({ excludedAndSupported: 0 }),
+      }),
+    );
 
     const completed = store.getJob(job.id);
     const canonical = runStore.getPersistedAnalysisRunForJob(job.id);

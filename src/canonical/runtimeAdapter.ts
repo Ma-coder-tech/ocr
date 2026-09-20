@@ -39,6 +39,11 @@ import type {
   CanonicalStatementAnalysis,
 } from "./types.js";
 import type { FeeKnowledgeIntelligenceRecord } from "./feeKnowledgeTypes.js";
+import {
+  consumeInternalFeeSemantics,
+  type InternalObservedFeeComponents,
+  type InternalProcessorMarkupSemantics,
+} from "../claimAuthorityF4/observedFeeComponentConsumer.js";
 
 export type CanonicalRuntimeInputAdmissionStatus =
   | "canonical_evidence"
@@ -165,6 +170,10 @@ export type CanonicalRuntimeAdapterInput = {
 
 export type CanonicalRuntimeAdapterResult = {
   analysis: CanonicalStatementAnalysis;
+  /** Internal Claim & Authority component state; excluded from canonical and customer projections. */
+  internalObservedFeeComponents: InternalObservedFeeComponents;
+  /** F4 markup authority for legacy Package D selections; excluded from canonical and customer projections. */
+  internalProcessorMarkupSemantics: InternalProcessorMarkupSemantics;
   aiAdmissionAudit: CanonicalAiAdmissionAudit;
   inputAdmission: CanonicalRuntimeInputAdmission[];
   runtimeAiCapabilitySnapshots: RuntimeAiCapabilitySnapshot[];
@@ -214,8 +223,11 @@ export function buildCanonicalRuntimeAnalysis(input: CanonicalRuntimeAdapterInpu
     ? analysis
     : rebuildCustomerProjectionLayers(analysis, aiCapabilities);
 
+  const internalFeeSemantics = consumeInternalFeeSemantics(finalAnalysis);
   return {
     analysis: finalAnalysis,
+    internalObservedFeeComponents: internalFeeSemantics.observedFeeComponents,
+    internalProcessorMarkupSemantics: internalFeeSemantics.processorMarkup,
     aiAdmissionAudit: buildCanonicalAiAdmissionAudit({
       capabilities: finalAnalysis.aiCapabilities.capabilities,
       attempts: runtimeAi.snapshots,
@@ -294,8 +306,11 @@ export async function buildCanonicalRuntimeAnalysisWithRuntimeAi(input: Canonica
     merchantAttention: merchantLanguageRuntime.model,
   });
 
+  const internalFeeSemantics = consumeInternalFeeSemantics(finalAnalysis);
   return {
     analysis: finalAnalysis,
+    internalObservedFeeComponents: internalFeeSemantics.observedFeeComponents,
+    internalProcessorMarkupSemantics: internalFeeSemantics.processorMarkup,
     aiAdmissionAudit: buildCanonicalAiAdmissionAudit({
       capabilities: finalAnalysis.aiCapabilities.capabilities,
       attempts: snapshots,
