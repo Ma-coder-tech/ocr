@@ -88,6 +88,25 @@ describe("F4 shadow migration", () => {
     }, {})).toEqual({ agreement: 3, stronger_refusal: 2, unresolved_unknown: 3 });
   });
 
+  it("binds only source-backed, canonically included interchange detail to the broad component", () => {
+    const analysis = fixture();
+    const row = analysis.feeLedger.rows[0];
+    row.role = "interchange_detail_row";
+    row.contributionDecision.reasonCode = "pass_through_fee_charge_included";
+    expect(decision(analysis, ":component").status).toBe("supported");
+    expect(decision(analysis, ":markup").status).toBe("refused");
+    expect(decision(analysis, ":collector").status).toBe("unknown");
+    expect(decision(analysis, ":contractual_controller").status).toBe("unknown");
+    expect(decision(analysis, ":actionability").status).toBe("refused");
+    expect(decision(analysis, ":savings").status).toBe("refused");
+
+    row.contributionDecision.reasonCode = "interchange_without_control_coverage";
+    expect(decision(analysis, ":component").status).toBe("unknown");
+    row.contributionDecision.reasonCode = "pass_through_fee_charge_included";
+    analysis.feeLedger.sourceOccurrences[0].pageNumber = null;
+    expect(decision(analysis, ":component").status).toBe("unknown");
+  });
+
   it("holds canonical money, selected semantics, opportunity and customer output byte-for-byte, and replays deterministically", () => {
     const analysis = fixture();
     const before = JSON.stringify(analysis);

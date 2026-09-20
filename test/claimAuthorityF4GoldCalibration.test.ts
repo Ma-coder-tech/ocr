@@ -18,7 +18,7 @@ describe("F4 provisional real Gold fixture calibration", () => {
       ],
       totals: {
         exact: { agreement: 850, stronger_refusal: 24, unresolved_unknown: 714 },
-        proxy: { agreement: 1109, stronger_refusal: 54, unresolved_unknown: 35 },
+        proxy: { agreement: 1121, stronger_refusal: 54, unresolved_unknown: 23 },
       },
     });
     expect(report.cases).toHaveLength(7);
@@ -28,10 +28,19 @@ describe("F4 provisional real Gold fixture calibration", () => {
       .filter((item: any) => item.basis === "exact_semantic" && item.relation === "stronger_refusal");
     expect(markupRefusals.every((item: any) => item.semanticCode === "processor_markup")).toBe(true);
     expect(markupRefusals.reduce((sum: number, item: any) => sum + item.count, 0)).toBe(24);
+    expect(report.cases.find((item: any) => item.caseId === "G1").componentSupportedByRole)
+      .toMatchObject({ "interchange_detail_row/pass_through_fee_charge_included/included": 6 });
+    expect(report.cases.find((item: any) => item.caseId === "G7").componentSupportedByRole)
+      .toMatchObject({ "interchange_detail_row/pass_through_fee_charge_included/included": 6 });
     expect(report.cases.find((item: any) => item.caseId === "G1").componentUnknownByRole)
-      .toMatchObject({ "interchange_detail_row/pass_through_fee_charge_included/included": 6 });
+      .not.toHaveProperty("interchange_detail_row/pass_through_fee_charge_included/included");
     expect(report.cases.find((item: any) => item.caseId === "G7").componentUnknownByRole)
-      .toMatchObject({ "interchange_detail_row/pass_through_fee_charge_included/included": 6 });
+      .not.toHaveProperty("interchange_detail_row/pass_through_fee_charge_included/included");
+    expect(report.cases.flatMap((item: any) => Object.keys(item.componentSupportedByRole))
+      .every((role: string) => role === "individual_charge/individual_charge_included/included"
+        || role === "interchange_detail_row/pass_through_fee_charge_included/included")).toBe(true);
+    expect(report.cases.reduce((sum: number, item: any) => sum
+      + (item.componentSupportedByRole["interchange_detail_row/pass_through_fee_charge_included/included"] ?? 0), 0)).toBe(12);
     expect(report.cases.find((item: any) => item.caseId === "G8").semanticAnchors)
       .toContainEqual({ assertionId: "G8-NO-SAVINGS", semanticStatus: "refused",
         sourceExecutionStatus: "not_source_executable" });

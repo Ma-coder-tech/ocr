@@ -112,6 +112,13 @@ for (const fixture of fixtures) {
   const readiness = report.comparisons.find((item) => item.decisionKey === "statement:ownership_actionability_claim_readiness");
   if (!readiness) throw new Error("F4 customer readiness comparison absent");
   const componentUnknownByRole: Record<string, number> = {};
+  const componentSupportedByRole: Record<string, number> = {};
+  for (const decision of report.decisions.filter((item) => item.semanticCode === "merchant_facing_fee_component" && item.status === "supported")) {
+    const row = analysis.feeLedger.rows.find((item) => item.id === decision.feeRowId);
+    if (!row) throw new Error("F4 supported component decision row absent");
+    const key = `${row.role}/${row.contributionDecision.reasonCode}/${row.contributesToUniqueTotal ? "included" : "excluded"}`;
+    componentSupportedByRole[key] = (componentSupportedByRole[key] ?? 0) + 1;
+  }
   for (const decision of report.decisions.filter((item) => item.semanticCode === "merchant_facing_fee_component" && item.status === "unknown")) {
     const row = analysis.feeLedger.rows.find((item) => item.id === decision.feeRowId);
     if (!row) throw new Error("F4 component decision row absent");
@@ -129,6 +136,7 @@ for (const fixture of fixtures) {
     materialDivergences: materialGroups(report.comparisons, report.decisions),
     customerReadiness: { currentPermission: readiness.currentValue, shadowStatus: readiness.shadowStatus,
       comparisonBasis: readiness.comparisonBasis, relation: readiness.relation },
+    componentSupportedByRole: Object.fromEntries(Object.entries(componentSupportedByRole).sort(([a], [b]) => a.localeCompare(b))),
     componentUnknownByRole: Object.fromEntries(Object.entries(componentUnknownByRole).sort(([a], [b]) => a.localeCompare(b))),
     completeness: {
       savingsMissingStatementTotal: report.decisions.filter((item) => item.dimension === "savings" && item.missingGates.includes("statement_total")).length,

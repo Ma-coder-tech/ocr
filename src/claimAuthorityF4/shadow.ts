@@ -133,9 +133,14 @@ function rowEvidence(analysis: CanonicalStatementAnalysis, row: CanonicalFeeRow)
     && item.pageNumber !== null && analysis.evidence.some((record) => record.id === item.evidenceRef
       && record.documentId === item.documentId && record.pageNumber === item.pageNumber));
   if (!observed) return noEvidence;
-  const structural = row.role === "individual_charge" && row.contributesToUniqueTotal
+  const feeComponentRole = (row.role === "individual_charge"
+    && row.contributionDecision.reasonCode === "individual_charge_included")
+    || (row.role === "interchange_detail_row"
+      && row.contributionDecision.reasonCode === "pass_through_fee_charge_included");
+  // The interchange reason is a canonical inclusion code, not contractual pass-through authority.
+  const structural = feeComponentRole && row.contributesToUniqueTotal
     && row.contributionDecision.contributes && row.selectedAmount !== null
-    && row.selectedAmount.amountMinor > 0 && row.contributionDecision.reasonCode === "individual_charge_included"
+    && row.selectedAmount.amountMinor > 0
     && row.parserInterpretationIds.length > 0;
   return {
     lanes: structural ? ["statement_source_document", "statement_structural_evidence"] : ["statement_source_document"],
