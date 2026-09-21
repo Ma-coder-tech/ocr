@@ -6,6 +6,7 @@ import type { BusinessTypeId } from "../src/businessTypes.js";
 import { buildCanonicalStatementFactsFromParsedDocument } from "../src/canonical/buildCanonicalFacts.js";
 import { evaluateF4Shadow, type F4LegacyComparison, type F4ShadowDecision } from "../src/claimAuthorityF4/shadow.js";
 import { consumeInternalFeeSemantics } from "../src/claimAuthorityF4/observedFeeComponentConsumer.js";
+import { buildProductionReportProjection } from "../src/canonical/productionReportProjection.js";
 
 // These are existing repository observations, not authenticated Gold source mappings.
 // Names stay local to the loader and never enter the privacy-safe result.
@@ -105,10 +106,13 @@ for (const fixture of fixtures) {
     sourceFileName: fixture.file, businessType: fixture.businessType,
   });
   const canonicalBefore = JSON.stringify(analysis);
+  const reportProjectionBefore = JSON.stringify(buildProductionReportProjection(analysis));
   const report = evaluateF4Shadow({ analysis });
   const internalSemantics = consumeInternalFeeSemantics(analysis);
   if (JSON.stringify(analysis) !== canonicalBefore)
     throw new Error(`Internal F4 consumption changed canonical money or downstream state for ${fixture.caseId}`);
+  if (JSON.stringify(buildProductionReportProjection(analysis)) !== reportProjectionBefore)
+    throw new Error(`Internal F4 consumption changed canonical report projection for ${fixture.caseId}`);
   const internal = internalSemantics.observedFeeComponents;
   const internalMarkup = internalSemantics.processorMarkup;
   if (internal.status !== "available" || internal.legacyComparison.excludedAndSupported !== 0
@@ -126,6 +130,20 @@ for (const fixture of fixtures) {
     })) throw new Error(`Internal processor-markup authority diverged for ${fixture.caseId}`);
   if (internalMarkup.comparison.supported !== 0 || internalMarkup.comparison.unknown !== 0)
     throw new Error(`Unexpected positive or unknown processor-markup authority for ${fixture.caseId}`);
+  const attentionShadow = internalSemantics.merchantAttentionMarkupShadow;
+  if (attentionShadow.status !== "available"
+    || attentionShadow.summary.legacyMarkupRows !== selectedMarkup.length
+    || attentionShadow.summary.authorityExceeding !== selectedMarkup.length
+    || attentionShadow.summary.agreement !== 0 || attentionShadow.summary.noAttentionItem !== 0
+    || attentionShadow.summary.observedComponentSupported !== selectedMarkup.length
+    || attentionShadow.rows.some((row) => row.guidanceStatus !== "authority_exceeding"
+      || row.f4.processorMarkup.status !== "refused" || row.f4.actionability.status !== "refused"
+      || row.f4.economicBeneficiary.status !== "unknown" || row.f4.contractualController.status !== "unknown"
+      || row.f4.observedFeeComponent.status !== "supported"
+      || row.currentAttention?.attentionType !== "potential_negotiation"
+      || row.currentAttention.actionType !== "request_pricing_review"
+      || row.neutralFallbackCandidate?.feeMeaning !== "observed_fee_component"))
+    throw new Error(`Merchant-attention markup shadow diverged for ${fixture.caseId}`);
   if (report.publicProbe !== null || report.decisions.some((item) => item.status === "supported"
     && item.semanticCode !== "merchant_facing_fee_component"))
     throw new Error(`F4 Gold calibration produced an out-of-scope positive claim for ${fixture.caseId}`);
@@ -161,6 +179,7 @@ for (const fixture of fixtures) {
     componentSupportedByRole: Object.fromEntries(Object.entries(componentSupportedByRole).sort(([a], [b]) => a.localeCompare(b))),
     componentUnknownByRole: Object.fromEntries(Object.entries(componentUnknownByRole).sort(([a], [b]) => a.localeCompare(b))),
     internalMarkup: internalMarkup.comparison,
+    merchantAttentionMarkupShadow: attentionShadow.summary,
     completeness: {
       savingsMissingStatementTotal: report.decisions.filter((item) => item.dimension === "savings" && item.missingGates.includes("statement_total")).length,
       savingsMissingFeeComposition: report.decisions.filter((item) => item.dimension === "savings" && item.missingGates.includes("fee_composition")).length,
@@ -173,6 +192,10 @@ for (const fixture of fixtures) {
 
 const totals = { exact: {} as Count, proxy: {} as Count };
 const internalMarkupTotals = { legacySelected: 0, supported: 0, refused: 0, unknown: 0 };
+const merchantAttentionMarkupShadowTotals = {
+  legacyMarkupRows: 0, agreement: 0, authorityExceeding: 0, noAttentionItem: 0,
+  observedComponentSupported: 0, currentResearchQuestions: 0, selectedResearchQuestions: 0,
+};
 for (const item of cases) {
   for (const basis of ["exact", "proxy"] as const) {
     for (const [relation, count] of Object.entries(item.comparisons[basis]))
@@ -180,12 +203,20 @@ for (const item of cases) {
   }
   for (const key of ["legacySelected", "supported", "refused", "unknown"] as const)
     internalMarkupTotals[key] += item.internalMarkup[key];
+  for (const key of Object.keys(merchantAttentionMarkupShadowTotals) as Array<keyof typeof merchantAttentionMarkupShadowTotals>)
+    merchantAttentionMarkupShadowTotals[key] += item.merchantAttentionMarkupShadow[key];
 }
 for (const basis of ["exact", "proxy"] as const)
   totals[basis] = Object.fromEntries(Object.entries(totals[basis]).sort(([a], [b]) => a.localeCompare(b)));
 if (internalMarkupTotals.legacySelected !== 24 || internalMarkupTotals.refused !== 24
   || internalMarkupTotals.supported !== 0 || internalMarkupTotals.unknown !== 0)
   throw new Error("F4 provisional calibration processor-markup refusal count changed");
+if (merchantAttentionMarkupShadowTotals.legacyMarkupRows !== 24
+  || merchantAttentionMarkupShadowTotals.authorityExceeding !== 24
+  || merchantAttentionMarkupShadowTotals.agreement !== 0
+  || merchantAttentionMarkupShadowTotals.noAttentionItem !== 0
+  || merchantAttentionMarkupShadowTotals.observedComponentSupported !== 24)
+  throw new Error("F4 provisional calibration merchant-attention shadow count changed");
 
 const result = {
   schemaVersion: "f4_gold_shadow_calibration_v1",
@@ -197,6 +228,6 @@ const result = {
     { caseId: "G6", reason: "exact_source_identity_and_mapping_unresolved" },
     { caseId: "G9", reason: "original_gold_source_unavailable" },
   ],
-  totals, internalMarkupTotals, cases,
+  totals, internalMarkupTotals, merchantAttentionMarkupShadowTotals, cases,
 };
 process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);

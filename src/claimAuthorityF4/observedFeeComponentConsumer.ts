@@ -1,6 +1,10 @@
 import type { CanonicalFeeRow, CanonicalStatementAnalysis } from "../canonical/types.js";
 import { processorMarkupRule } from "../claimAuthorityF2/rules.js";
 import { tryEvaluateF4Shadow, type F4ShadowDecision } from "./shadow.js";
+import {
+  compareMerchantAttentionMarkupShadow,
+  type MerchantAttentionMarkupShadowComparison,
+} from "./merchantAttentionShadowComparison.js";
 
 /** Internal semantic state. It grants no ownership, pricing, actionability, or customer permission. */
 export type InternalObservedFeeComponents = {
@@ -43,6 +47,7 @@ export type InternalProcessorMarkupSemantics = {
 export type InternalFeeSemantics = {
   observedFeeComponents: InternalObservedFeeComponents;
   processorMarkup: InternalProcessorMarkupSemantics;
+  merchantAttentionMarkupShadow: MerchantAttentionMarkupShadowComparison;
 };
 
 export function processorMarkupStatusFromF4(decision: F4ShadowDecision | undefined):
@@ -162,7 +167,38 @@ export function consumeInternalFeeSemantics(analysis: CanonicalStatementAnalysis
       unknown: markupRows.filter((row) => row.status === "unknown").length,
     },
   };
-  return { observedFeeComponents, processorMarkup };
+  let merchantAttentionMarkupShadow: MerchantAttentionMarkupShadowComparison;
+  try {
+    merchantAttentionMarkupShadow = compareMerchantAttentionMarkupShadow({
+      analysis,
+      f4Report: result.status === "available" ? result.report : null,
+      observedFeeComponents,
+      processorMarkup,
+    });
+  } catch {
+    // A diagnostic comparison must never block canonical or customer projections.
+    merchantAttentionMarkupShadow = {
+      version: "merchant_attention_markup_shadow_v1",
+      standing: "internal_diagnostic_only",
+      status: "unavailable",
+      sourceReportId: result.status === "available" ? result.report.reportId : null,
+      rows: [],
+      summary: {
+        legacyMarkupRows: markupRows.length,
+        agreement: 0,
+        authorityExceeding: 0,
+        noAttentionItem: 0,
+        observedComponentSupported: 0,
+        currentResearchQuestions: 0,
+        selectedResearchQuestions: 0,
+      },
+    };
+  }
+  return {
+    observedFeeComponents,
+    processorMarkup,
+    merchantAttentionMarkupShadow,
+  };
 }
 
 export function consumeObservedFeeComponents(analysis: CanonicalStatementAnalysis): InternalObservedFeeComponents {

@@ -44,6 +44,7 @@ import {
   type InternalObservedFeeComponents,
   type InternalProcessorMarkupSemantics,
 } from "../claimAuthorityF4/observedFeeComponentConsumer.js";
+import type { MerchantAttentionMarkupShadowComparison } from "../claimAuthorityF4/merchantAttentionShadowComparison.js";
 
 export type CanonicalRuntimeInputAdmissionStatus =
   | "canonical_evidence"
@@ -174,6 +175,8 @@ export type CanonicalRuntimeAdapterResult = {
   internalObservedFeeComponents: InternalObservedFeeComponents;
   /** F4 markup authority for legacy Package D selections; excluded from canonical and customer projections. */
   internalProcessorMarkupSemantics: InternalProcessorMarkupSemantics;
+  /** Diagnostic comparison only; it cannot modify Merchant Attention or its projections. */
+  internalMerchantAttentionMarkupShadow: MerchantAttentionMarkupShadowComparison;
   aiAdmissionAudit: CanonicalAiAdmissionAudit;
   inputAdmission: CanonicalRuntimeInputAdmission[];
   runtimeAiCapabilitySnapshots: RuntimeAiCapabilitySnapshot[];
@@ -228,6 +231,7 @@ export function buildCanonicalRuntimeAnalysis(input: CanonicalRuntimeAdapterInpu
     analysis: finalAnalysis,
     internalObservedFeeComponents: internalFeeSemantics.observedFeeComponents,
     internalProcessorMarkupSemantics: internalFeeSemantics.processorMarkup,
+    internalMerchantAttentionMarkupShadow: internalFeeSemantics.merchantAttentionMarkupShadow,
     aiAdmissionAudit: buildCanonicalAiAdmissionAudit({
       capabilities: finalAnalysis.aiCapabilities.capabilities,
       attempts: runtimeAi.snapshots,
@@ -311,6 +315,7 @@ export async function buildCanonicalRuntimeAnalysisWithRuntimeAi(input: Canonica
     analysis: finalAnalysis,
     internalObservedFeeComponents: internalFeeSemantics.observedFeeComponents,
     internalProcessorMarkupSemantics: internalFeeSemantics.processorMarkup,
+    internalMerchantAttentionMarkupShadow: internalFeeSemantics.merchantAttentionMarkupShadow,
     aiAdmissionAudit: buildCanonicalAiAdmissionAudit({
       capabilities: finalAnalysis.aiCapabilities.capabilities,
       attempts: snapshots,

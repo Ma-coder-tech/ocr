@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { buildCanonicalStatementFactsFromParsedDocument } from "../src/canonical/buildCanonicalFacts.js";
 import { buildCanonicalFeeOwnershipActionability } from "../src/canonical/feeOwnershipActionability.js";
 import { buildCanonicalFeeLedger } from "../src/canonical/feeLedger.js";
+import { buildCanonicalMerchantAttentionModel } from "../src/canonical/merchantAttention.js";
 import type { CanonicalStatementAnalysis } from "../src/canonical/types.js";
 import { buildF4DecisionGraph, evaluateF4Shadow, tryEvaluateF4Shadow } from "../src/claimAuthorityF4/shadow.js";
 import {
@@ -11,6 +12,7 @@ import {
   consumeObservedFeeComponents,
   processorMarkupStatusFromF4,
 } from "../src/claimAuthorityF4/observedFeeComponentConsumer.js";
+import { compareMerchantAttentionMarkupShadow } from "../src/claimAuthorityF4/merchantAttentionShadowComparison.js";
 import { createF3PublicSnapshot } from "../src/claimAuthorityF3/snapshot.js";
 import type { F3PublicSnapshot } from "../src/claimAuthorityF3/types.js";
 import type { ParsedDocument } from "../src/parser.js";
@@ -66,6 +68,85 @@ function setPeriod(analysis: CanonicalStatementAnalysis, start: string, end: str
 }
 
 describe("F4 shadow migration", () => {
+  it("compares legacy markup attention with F4 without changing canonical or customer state", () => {
+    const analysis = fixture();
+    analysis.merchantAttention = buildCanonicalMerchantAttentionModel(analysis);
+    const before = JSON.stringify(analysis);
+    const row = analysis.feeLedger.rows[0]!;
+    const internal = consumeInternalFeeSemantics(analysis);
+    const shadow = internal.merchantAttentionMarkupShadow;
+
+    expect(shadow).toMatchObject({
+      standing: "internal_diagnostic_only", status: "available",
+      summary: { legacyMarkupRows: 1, agreement: 0, authorityExceeding: 1, noAttentionItem: 0,
+        observedComponentSupported: 1, currentResearchQuestions: 1 },
+      rows: [{
+        feeRowId: row.id,
+        observedAmount: row.selectedAmount,
+        canonicalContributionIncluded: true,
+        currentSelected: { category: "processor_markup", economicBeneficiary: "processor",
+          contractualController: "processor", actionabilityCeiling: "potentially_actionable" },
+        currentAttention: { attentionType: "potential_negotiation", actionType: "request_pricing_review",
+          merchantQuestion: expect.any(String), priorityFinding: true },
+        researchPriorityEffect: { basis: "default_deterministic_question_plan_no_execution",
+          status: "planned_question", legacyCategoryAndCeilingBoost: 500,
+          legacyMarkupBoost: 240, legacyActionabilityBoost: 260 },
+        f4: { processorMarkup: { status: "refused" }, economicBeneficiary: { status: "unknown" },
+          contractualController: { status: "unknown" }, merchantFacingPriceController: { status: "unknown" },
+          actionability: { status: "refused" }, observedFeeComponent: { status: "supported" } },
+        guidanceStatus: "authority_exceeding",
+        neutralFallbackCandidate: { standing: "shadow_candidate_only", feeMeaning: "observed_fee_component",
+          pricingQuestion: "unresolved", partyAndControl: "evidence_needed", actionability: "not_established" },
+      }],
+    });
+    expect(shadow.rows[0]!.authorityExceedanceReasons).toEqual(expect.arrayContaining([
+      "markup_category_without_f4_authority", "negotiation_without_f4_actionability",
+      "processor_contractual_controller_without_f4_authority", "research_priority_uses_unsupported_markup_premise",
+      "research_priority_uses_unsupported_actionability_premise",
+    ]));
+    expect(JSON.stringify(analysis)).toBe(before);
+
+    // A separate statement-level rate review must not become a markup-row comparison.
+    const statementItem = { ...structuredClone(analysis.merchantAttention.items[0]!),
+      id: "attention_statement_pricing_above_reference", scope: "statement_pricing" as const,
+      feeRowIds: [], observedAmount: null };
+    analysis.merchantAttention.items.push(statementItem);
+    const statementItemBefore = JSON.stringify(statementItem);
+    const independent = compareMerchantAttentionMarkupShadow({
+      analysis, f4Report: evaluateF4Shadow({ analysis }),
+      observedFeeComponents: internal.observedFeeComponents,
+      processorMarkup: internal.processorMarkup,
+    });
+    expect(independent.summary.legacyMarkupRows).toBe(1);
+    expect(independent.rows[0]!.currentAttention?.itemId).toBe(shadow.rows[0]!.currentAttention?.itemId);
+    expect(JSON.stringify(statementItem)).toBe(statementItemBefore);
+  });
+
+  it("leaves non-markup Merchant Attention outside the shadow comparison", () => {
+    const analysis = fixture();
+    analysis.feeOwnershipActionability.rowClassifications[0]!.selected.category = "administrative_fee";
+    analysis.merchantAttention = buildCanonicalMerchantAttentionModel(analysis);
+    const before = JSON.stringify(analysis);
+    const shadow = consumeInternalFeeSemantics(analysis).merchantAttentionMarkupShadow;
+    expect(shadow.summary.legacyMarkupRows).toBe(0);
+    expect(shadow.rows).toEqual([]);
+    expect(JSON.stringify(analysis)).toBe(before);
+  });
+
+  it("keeps unavailable F4 markup authority unknown in the attention shadow", () => {
+    const analysis = fixture();
+    analysis.merchantAttention = buildCanonicalMerchantAttentionModel(analysis);
+    analysis.validation.status = "invalid";
+    const before = JSON.stringify(analysis);
+    const shadow = consumeInternalFeeSemantics(analysis).merchantAttentionMarkupShadow;
+    expect(shadow).toMatchObject({
+      status: "unavailable", summary: { legacyMarkupRows: 1, authorityExceeding: 1 },
+      rows: [{ f4: { processorMarkup: { status: "unknown" }, observedFeeComponent: { status: "unknown" } },
+        guidanceStatus: "authority_exceeding", neutralFallbackCandidate: { feeMeaning: "unknown" } }],
+    });
+    expect(JSON.stringify(analysis)).toBe(before);
+  });
+
   it("retires a legacy Package D markup positive only at the internal semantic read boundary", () => {
     const analysis = fixture();
     const before = JSON.stringify(analysis);

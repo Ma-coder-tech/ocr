@@ -65,8 +65,13 @@ describe("canonical runtime adapter", () => {
       semanticAuthority: "claim_authority_f4",
       status: "available",
     });
+    expect(result.internalMerchantAttentionMarkupShadow).toMatchObject({
+      standing: "internal_diagnostic_only",
+      status: "available",
+    });
     expect(JSON.stringify(result.analysis)).not.toContain("internalObservedFeeComponents");
     expect(JSON.stringify(result.analysis)).not.toContain("internalProcessorMarkupSemantics");
+    expect(JSON.stringify(result.analysis)).not.toContain("internalMerchantAttentionMarkupShadow");
   });
 
   it("does not use filenames, paths, or malformed refs as canonical runtime identity", () => {
