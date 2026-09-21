@@ -6,7 +6,10 @@ import type { BusinessTypeId } from "../src/businessTypes.js";
 import { buildCanonicalStatementFactsFromParsedDocument } from "../src/canonical/buildCanonicalFacts.js";
 import { evaluateF4Shadow, type F4LegacyComparison, type F4ShadowDecision } from "../src/claimAuthorityF4/shadow.js";
 import { consumeInternalFeeSemantics } from "../src/claimAuthorityF4/observedFeeComponentConsumer.js";
-import { buildProductionReportProjection } from "../src/canonical/productionReportProjection.js";
+import {
+  authorityBackedPricingEvidenceCopyEligible,
+  buildProductionReportProjection,
+} from "../src/canonical/productionReportProjection.js";
 
 // These are existing repository observations, not authenticated Gold source mappings.
 // Names stay local to the loader and never enter the privacy-safe result.
@@ -158,6 +161,9 @@ for (const fixture of fixtures) {
     priceControllerUnknown: attentionShadow.rows.filter((row) => row.authorityBackedSemantics.merchantFacingPriceController === "unknown").length,
     actionabilityNotEstablished: attentionShadow.rows.filter((row) => row.authorityBackedSemantics.actionability === "not_established").length,
   };
+  const customerFacingCopyCutover = {
+    eligibleRows: attentionShadow.rows.filter(authorityBackedPricingEvidenceCopyEligible).length,
+  };
   if (report.publicProbe !== null || report.decisions.some((item) => item.status === "supported"
     && item.semanticCode !== "merchant_facing_fee_component"))
     throw new Error(`F4 Gold calibration produced an out-of-scope positive claim for ${fixture.caseId}`);
@@ -195,6 +201,7 @@ for (const fixture of fixtures) {
     internalMarkup: internalMarkup.comparison,
     merchantAttentionMarkupShadow: attentionShadow.summary,
     internalMerchantAttentionRetirement: internalRetirement,
+    customerFacingActionToolkitCopyCutover: customerFacingCopyCutover,
     completeness: {
       savingsMissingStatementTotal: report.decisions.filter((item) => item.dimension === "savings" && item.missingGates.includes("statement_total")).length,
       savingsMissingFeeComposition: report.decisions.filter((item) => item.dimension === "savings" && item.missingGates.includes("fee_composition")).length,
@@ -215,6 +222,7 @@ const internalMerchantAttentionRetirementTotals = {
   negotiationNotEstablished: 0, observedComponentSupported: 0, ownerUnknown: 0,
   contractualControllerUnknown: 0, priceControllerUnknown: 0, actionabilityNotEstablished: 0,
 };
+const customerFacingActionToolkitCopyCutoverTotals = { eligibleRows: 0 };
 for (const item of cases) {
   for (const basis of ["exact", "proxy"] as const) {
     for (const [relation, count] of Object.entries(item.comparisons[basis]))
@@ -226,6 +234,7 @@ for (const item of cases) {
     merchantAttentionMarkupShadowTotals[key] += item.merchantAttentionMarkupShadow[key];
   for (const key of Object.keys(internalMerchantAttentionRetirementTotals) as Array<keyof typeof internalMerchantAttentionRetirementTotals>)
     internalMerchantAttentionRetirementTotals[key] += item.internalMerchantAttentionRetirement[key];
+  customerFacingActionToolkitCopyCutoverTotals.eligibleRows += item.customerFacingActionToolkitCopyCutover.eligibleRows;
 }
 for (const basis of ["exact", "proxy"] as const)
   totals[basis] = Object.fromEntries(Object.entries(totals[basis]).sort(([a], [b]) => a.localeCompare(b)));
@@ -240,6 +249,8 @@ if (merchantAttentionMarkupShadowTotals.legacyMarkupRows !== 24
   throw new Error("F4 provisional calibration merchant-attention shadow count changed");
 if (Object.values(internalMerchantAttentionRetirementTotals).some((count) => count !== 24))
   throw new Error("F4 provisional calibration internal merchant-attention retirement count changed");
+if (customerFacingActionToolkitCopyCutoverTotals.eligibleRows !== 24)
+  throw new Error("F4 provisional calibration customer-facing copy gate count changed");
 
 const result = {
   schemaVersion: "f4_gold_shadow_calibration_v1",
@@ -251,6 +262,7 @@ const result = {
     { caseId: "G6", reason: "exact_source_identity_and_mapping_unresolved" },
     { caseId: "G9", reason: "original_gold_source_unavailable" },
   ],
-  totals, internalMarkupTotals, merchantAttentionMarkupShadowTotals, internalMerchantAttentionRetirementTotals, cases,
+  totals, internalMarkupTotals, merchantAttentionMarkupShadowTotals, internalMerchantAttentionRetirementTotals,
+  customerFacingActionToolkitCopyCutoverTotals, cases,
 };
 process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);

@@ -26,7 +26,9 @@ export async function buildProductionReportFromRuntime(
 ): Promise<ProductionReportRuntimeResult> {
   const result = await buildCanonicalRuntimeAnalysisWithRuntimeAi(input);
   return {
-    projection: buildProductionReportProjection(result.analysis),
+    projection: buildProductionReportProjection(result.analysis, {
+      merchantAttentionMarkupShadow: result.internalMerchantAttentionMarkupShadow,
+    }),
     merchantLanguageRuntime: result.merchantLanguageRuntime,
   };
 }

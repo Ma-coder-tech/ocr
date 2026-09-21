@@ -28,6 +28,7 @@ describe("F4 provisional real Gold fixture calibration", () => {
         priceControllerUnknown: 24,
         actionabilityNotEstablished: 24,
       },
+      customerFacingActionToolkitCopyCutoverTotals: { eligibleRows: 24 },
     });
     expect(report.cases).toHaveLength(7);
     expect(report.cases.every((item: any) => item.canonicalStatus === "valid"

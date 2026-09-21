@@ -19,7 +19,32 @@ import type {
 
 const USD = "USD" as const;
 
-export function buildProductionReportProjection(analysis: CanonicalStatementAnalysis): ProductionReportProjection {
+type ProductionReportMarkupAuthorityRow = {
+  currentSelected: { category: "processor_markup" };
+  currentAttention: null | { itemId: string; actionType: string };
+  authorityBackedSemantics: {
+    observedFeeComponent: "supported" | "unknown";
+    potentialNegotiation: "not_established" | "unassessed";
+  };
+};
+
+export type ProductionReportAuthorityContext = {
+  merchantAttentionMarkupShadow: {
+    status: "available" | "unavailable";
+    rows: ProductionReportMarkupAuthorityRow[];
+  };
+};
+
+const AUTHORITY_BACKED_PRICING_EVIDENCE_COPY = {
+  whatToDo: "Request the current pricing agreement or schedule and a written explanation of this charge.",
+  why: "The statement confirms the charge, but its pricing basis, responsible party, and actionability are not established.",
+  exactAsk: "Please provide the current pricing agreement or schedule and identify the term that applies to this charge.",
+} as const;
+
+export function buildProductionReportProjection(
+  analysis: CanonicalStatementAnalysis,
+  authorityContext?: ProductionReportAuthorityContext,
+): ProductionReportProjection {
   const visibility = visibilityCeiling(analysis);
   const header = {
     title: "Your RateReveal statement review" as const,
@@ -58,7 +83,7 @@ export function buildProductionReportProjection(analysis: CanonicalStatementAnal
       items: questions,
     },
     allCharges: allCharges(analysis, visibility),
-    nextActions: nextActions(analysis, visibility),
+    nextActions: nextActions(analysis, visibility, authorityContext),
     monitoring: cleanMonitoring(analysis, visibility, experience),
     methodology: {
       heading: "How RateReveal reviewed this statement",
@@ -449,25 +474,60 @@ function allCharges(analysis: CanonicalStatementAnalysis, visibility: Visibility
   };
 }
 
-function nextActions(analysis: CanonicalStatementAnalysis, visibility: VisibilityCeiling): ProductionReportablePayload["nextActions"] {
+function nextActions(
+  analysis: CanonicalStatementAnalysis,
+  visibility: VisibilityCeiling,
+  authorityContext?: ProductionReportAuthorityContext,
+): ProductionReportablePayload["nextActions"] {
   if (!visibility.actions || !visibility.ownershipActionability) {
     return { heading: "What to do next", status: "omitted", modules: [], guidance: null };
   }
-  const modules = analysis.merchantAttention.items.filter((item) => item.surfaceEligibility.actionToolkit && item.actionToolkit).map((item) => ({
-    id: item.actionToolkit!.moduleId,
-    actionType: merchantActionType(item.actionToolkit!.actionType),
-    title: item.actionToolkit!.actionType === "request_itemization" ? "Ask for a breakdown" : customerCopy(item.actionToolkit!.whatToDo),
-    whatToDo: customerCopy(item.actionToolkit!.whatToDo),
-    why: customerCopy(item.actionToolkit!.why),
-    statementEvidenceRefs: visibility.evidenceCalculations ? [...item.actionToolkit!.statementEvidenceRefs] : [],
-    exactAsk: item.actionToolkit!.exactAsk ? customerCopy(item.actionToolkit!.exactAsk) : null,
-    requestDocumentation: item.actionToolkit!.requestDocumentation.map(customerCopy),
-    followUp: item.actionToolkit!.unclearAnswerFollowUp ? customerCopy(item.actionToolkit!.unclearAnswerFollowUp) : null,
-    avoidClaiming: item.actionToolkit!.avoidClaiming.map(customerCopy),
-    successCriteria: item.actionToolkit!.successCriteria.map(customerCopy),
-  }));
+  const neutralPricingEvidenceItemIds = authorityBackedPricingEvidenceItemIds(authorityContext);
+  const modules = analysis.merchantAttention.items.filter((item) => item.surfaceEligibility.actionToolkit && item.actionToolkit).map((item) => {
+    const toolkit = item.actionToolkit!;
+    const useAuthorityBackedCopy = toolkit.actionType === "request_pricing_review"
+      && neutralPricingEvidenceItemIds.has(item.id);
+    const whatToDo = useAuthorityBackedCopy ? AUTHORITY_BACKED_PRICING_EVIDENCE_COPY.whatToDo : toolkit.whatToDo;
+    return {
+      id: toolkit.moduleId,
+      actionType: merchantActionType(toolkit.actionType),
+      title: toolkit.actionType === "request_itemization" ? "Ask for a breakdown" : customerCopy(whatToDo),
+      whatToDo: customerCopy(whatToDo),
+      why: customerCopy(useAuthorityBackedCopy ? AUTHORITY_BACKED_PRICING_EVIDENCE_COPY.why : toolkit.why),
+      statementEvidenceRefs: visibility.evidenceCalculations ? [...toolkit.statementEvidenceRefs] : [],
+      exactAsk: useAuthorityBackedCopy
+        ? AUTHORITY_BACKED_PRICING_EVIDENCE_COPY.exactAsk
+        : toolkit.exactAsk ? customerCopy(toolkit.exactAsk) : null,
+      requestDocumentation: toolkit.requestDocumentation.map(customerCopy),
+      followUp: toolkit.unclearAnswerFollowUp ? customerCopy(toolkit.unclearAnswerFollowUp) : null,
+      avoidClaiming: toolkit.avoidClaiming.map(customerCopy),
+      successCriteria: toolkit.successCriteria.map(customerCopy),
+    };
+  });
   if (modules.length) return { heading: "What to do next", status: "shown", modules, guidance: null };
   return { heading: "What to do next", status: "omitted", modules: [], guidance: null };
+}
+
+function authorityBackedPricingEvidenceItemIds(
+  authorityContext?: ProductionReportAuthorityContext,
+): Set<string> {
+  const shadow = authorityContext?.merchantAttentionMarkupShadow;
+  if (!shadow || shadow.status !== "available") return new Set();
+  return new Set(shadow.rows.flatMap((row) => {
+    const attention = row.currentAttention;
+    return authorityBackedPricingEvidenceCopyEligible(row)
+      && attention?.actionType === "request_pricing_review"
+      ? [attention.itemId]
+      : [];
+  }));
+}
+
+export function authorityBackedPricingEvidenceCopyEligible(
+  row: ProductionReportMarkupAuthorityRow,
+): boolean {
+  return row.currentSelected.category === "processor_markup"
+    && row.authorityBackedSemantics.potentialNegotiation === "not_established"
+    && row.authorityBackedSemantics.observedFeeComponent === "supported";
 }
 
 function cleanMonitoring(
