@@ -164,6 +164,56 @@ for (const fixture of fixtures) {
   const customerFacingCopyCutover = {
     eligibleRows: attentionShadow.rows.filter(authorityBackedPricingEvidenceCopyEligible).length,
   };
+  const authorityContext = { merchantAttentionMarkupShadow: attentionShadow };
+  const cutoverProjection = buildProductionReportProjection(analysis, authorityContext);
+  const legacyProjection = buildProductionReportProjection(analysis);
+  const eligibleRows = attentionShadow.rows.filter(authorityBackedPricingEvidenceCopyEligible);
+  const eligibleFeeRowIds = new Set(eligibleRows.map((row) => row.feeRowId));
+  const eligibleItemIds = new Set(eligibleRows.flatMap((row) => row.currentAttention ? [row.currentAttention.itemId] : []));
+  const totalFeesMinor = Math.abs(analysis.financialFacts.totalFees.value?.amountMinor ?? 0);
+  const materialThresholdMinor = Math.max(1_000, Math.round(totalFeesMinor * 0.15));
+  const independentlyMaterialRows = eligibleRows.filter((row) => Math.abs(row.observedAmount?.amountMinor ?? 0) >= materialThresholdMinor);
+  const materialPriorityFindings = cutoverProjection.report?.priorityFindings.items
+    .filter((item) => eligibleItemIds.has(item.id)) ?? [];
+  const neutralAllCharges = cutoverProjection.report?.allCharges.rows.filter((row) => eligibleFeeRowIds.has(row.id)
+    && row.category === "Observed fee component" && row.likelyOwner === null) ?? [];
+  const coherentFindingCutover = {
+    eligibleRows: eligibleRows.length,
+    independentlyMaterialRows: independentlyMaterialRows.length,
+    belowMaterialityRows: eligibleRows.length - independentlyMaterialRows.length,
+  };
+  if (materialPriorityFindings.some((item) => item.attentionType !== "unresolved_pricing_question"
+    || item.category !== "Observed fee component" || item.likelyOwner !== null
+    || item.merchantTitle !== "Pricing basis for this charge needs clarification"
+    || /processor markup|processor.controlled|negotiat/i.test(`${item.category} ${item.merchantTitle} ${item.whyDeservesAttention} ${item.whatThisLikelyMeans}`)))
+    throw new Error(`Coherent finding cutover retained unsupported finding semantics for ${fixture.caseId}`);
+  const projectedEligibleCharges = cutoverProjection.report?.allCharges.rows.filter((row) => eligibleFeeRowIds.has(row.id)) ?? [];
+  if ((cutoverProjection.report?.allCharges.status !== "omitted" && neutralAllCharges.length !== projectedEligibleCharges.length)
+    || neutralAllCharges.some((row) => /processor markup|processor.controlled|negotiat/i.test(`${row.category} ${row.whatRateRevealKnows ?? ""}`)))
+    throw new Error(`Coherent finding cutover retained unsupported All Charges semantics for ${fixture.caseId}`);
+  if (cutoverProjection.report?.composition.categories.some((category) => category.id === "processor"
+    && category.label === "Processor markup"
+    && eligibleRows.every((eligible) => analysis.feeOwnershipActionability.rowClassifications
+      .filter((classification) => classification.selected.category === "processor_markup")
+      .some((classification) => classification.feeRowId === eligible.feeRowId)))) {
+    const nonGatedProcessorRows = analysis.feeOwnershipActionability.rowClassifications.some((classification) =>
+      ["processor_markup", "processor_per_item_fee", "administrative_fee"].includes(classification.selected.category)
+      && !eligibleFeeRowIds.has(classification.feeRowId));
+    if (!nonGatedProcessorRows) throw new Error(`Coherent finding cutover retained gated Processor markup composition for ${fixture.caseId}`);
+  }
+  if (Boolean(cutoverProjection.report) !== Boolean(legacyProjection.report))
+    throw new Error(`Coherent finding cutover changed report availability for ${fixture.caseId}`);
+  if (cutoverProjection.report && legacyProjection.report && JSON.stringify({
+    representedTotal: cutoverProjection.report.composition.representedTotal,
+    statementFeeTotal: cutoverProjection.report.composition.statementFeeTotal,
+    difference: cutoverProjection.report.composition.difference,
+    reconciled: cutoverProjection.report.composition.reconciled,
+  }) !== JSON.stringify({
+    representedTotal: legacyProjection.report.composition.representedTotal,
+    statementFeeTotal: legacyProjection.report.composition.statementFeeTotal,
+    difference: legacyProjection.report.composition.difference,
+    reconciled: legacyProjection.report.composition.reconciled,
+  })) throw new Error(`Coherent finding cutover changed projected financial totals for ${fixture.caseId}`);
   if (report.publicProbe !== null || report.decisions.some((item) => item.status === "supported"
     && item.semanticCode !== "merchant_facing_fee_component"))
     throw new Error(`F4 Gold calibration produced an out-of-scope positive claim for ${fixture.caseId}`);
@@ -202,6 +252,7 @@ for (const fixture of fixtures) {
     merchantAttentionMarkupShadow: attentionShadow.summary,
     internalMerchantAttentionRetirement: internalRetirement,
     customerFacingActionToolkitCopyCutover: customerFacingCopyCutover,
+    customerFacingCoherentFindingCutover: coherentFindingCutover,
     completeness: {
       savingsMissingStatementTotal: report.decisions.filter((item) => item.dimension === "savings" && item.missingGates.includes("statement_total")).length,
       savingsMissingFeeComposition: report.decisions.filter((item) => item.dimension === "savings" && item.missingGates.includes("fee_composition")).length,
@@ -223,6 +274,9 @@ const internalMerchantAttentionRetirementTotals = {
   contractualControllerUnknown: 0, priceControllerUnknown: 0, actionabilityNotEstablished: 0,
 };
 const customerFacingActionToolkitCopyCutoverTotals = { eligibleRows: 0 };
+const customerFacingCoherentFindingCutoverTotals = {
+  eligibleRows: 0, independentlyMaterialRows: 0, belowMaterialityRows: 0,
+};
 for (const item of cases) {
   for (const basis of ["exact", "proxy"] as const) {
     for (const [relation, count] of Object.entries(item.comparisons[basis]))
@@ -235,6 +289,8 @@ for (const item of cases) {
   for (const key of Object.keys(internalMerchantAttentionRetirementTotals) as Array<keyof typeof internalMerchantAttentionRetirementTotals>)
     internalMerchantAttentionRetirementTotals[key] += item.internalMerchantAttentionRetirement[key];
   customerFacingActionToolkitCopyCutoverTotals.eligibleRows += item.customerFacingActionToolkitCopyCutover.eligibleRows;
+  for (const key of Object.keys(customerFacingCoherentFindingCutoverTotals) as Array<keyof typeof customerFacingCoherentFindingCutoverTotals>)
+    customerFacingCoherentFindingCutoverTotals[key] += item.customerFacingCoherentFindingCutover[key];
 }
 for (const basis of ["exact", "proxy"] as const)
   totals[basis] = Object.fromEntries(Object.entries(totals[basis]).sort(([a], [b]) => a.localeCompare(b)));
@@ -251,6 +307,10 @@ if (Object.values(internalMerchantAttentionRetirementTotals).some((count) => cou
   throw new Error("F4 provisional calibration internal merchant-attention retirement count changed");
 if (customerFacingActionToolkitCopyCutoverTotals.eligibleRows !== 24)
   throw new Error("F4 provisional calibration customer-facing copy gate count changed");
+if (customerFacingCoherentFindingCutoverTotals.eligibleRows !== 24
+  || customerFacingCoherentFindingCutoverTotals.independentlyMaterialRows !== 5
+  || customerFacingCoherentFindingCutoverTotals.belowMaterialityRows !== 19)
+  throw new Error("F4 provisional calibration coherent finding cutover count changed");
 
 const result = {
   schemaVersion: "f4_gold_shadow_calibration_v1",
@@ -263,6 +323,6 @@ const result = {
     { caseId: "G9", reason: "original_gold_source_unavailable" },
   ],
   totals, internalMarkupTotals, merchantAttentionMarkupShadowTotals, internalMerchantAttentionRetirementTotals,
-  customerFacingActionToolkitCopyCutoverTotals, cases,
+  customerFacingActionToolkitCopyCutoverTotals, customerFacingCoherentFindingCutoverTotals, cases,
 };
 process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);

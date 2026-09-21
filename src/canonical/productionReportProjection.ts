@@ -20,6 +20,7 @@ import type {
 const USD = "USD" as const;
 
 type ProductionReportMarkupAuthorityRow = {
+  feeRowId: string;
   currentSelected: { category: "processor_markup" };
   currentAttention: null | { itemId: string; actionType: string };
   authorityBackedSemantics: {
@@ -40,6 +41,22 @@ const AUTHORITY_BACKED_PRICING_EVIDENCE_COPY = {
   why: "The statement confirms the charge, but its pricing basis, responsible party, and actionability are not established.",
   exactAsk: "Please provide the current pricing agreement or schedule and identify the term that applies to this charge.",
 } as const;
+
+const AUTHORITY_BACKED_FINDING_COPY = {
+  attentionType: "unresolved_pricing_question",
+  title: "Pricing basis for this charge needs clarification",
+  category: "Observed fee component",
+  compositionCategory: { id: "observed_fee_components", label: "Observed fee components" },
+  explanation: "This statement includes this fee component. Its pricing basis, responsible party, and actionability are not established.",
+  materialRationale: "This observed charge is materially significant, and its pricing basis needs supporting evidence.",
+} as const;
+
+type AuthorityBackedFindingCutover = {
+  itemIds: Set<string>;
+  feeRowIds: Set<string>;
+  materialItemIds: Set<string>;
+  materialFeeRowIds: Set<string>;
+};
 
 export function buildProductionReportProjection(
   analysis: CanonicalStatementAnalysis,
@@ -63,27 +80,28 @@ export function buildProductionReportProjection(
     });
   }
 
-  const questions = projectQuestions(analysis, visibility);
   const questionContext = openQuestionContext(analysis, visibility);
   const experience = resolveReportableExperience(analysis, visibility);
   const languageSource: ProductionMerchantLanguageSource = analysis.merchantAttention.interpretation.source === "admitted_ai_interpretation"
     ? "ai_assisted"
     : "deterministic_fallback";
+  const findingCutover = authorityBackedFindingCutover(analysis, authorityContext);
+  const questions = projectQuestions(analysis, visibility, findingCutover);
   const report: ProductionReportablePayload = {
     merchantLanguage: { source: languageSource, degraded: languageSource === "deterministic_fallback" },
     hero: hero(analysis, visibility),
     snapshot: snapshot(analysis, visibility),
     trustStrip: trustStrip(analysis, visibility),
-    composition: composition(analysis, visibility),
-    priorityFindings: findings(analysis, languageSource, visibility),
+    composition: composition(analysis, visibility, findingCutover),
+    priorityFindings: findings(analysis, languageSource, visibility, findingCutover),
     openQuestions: {
       heading: "What still needs checking",
       status: questions.length || questionContext.length ? "shown" : "omitted",
       context: questionContext,
       items: questions,
     },
-    allCharges: allCharges(analysis, visibility),
-    nextActions: nextActions(analysis, visibility, authorityContext),
+    allCharges: allCharges(analysis, visibility, findingCutover),
+    nextActions: nextActions(analysis, visibility, findingCutover),
     monitoring: cleanMonitoring(analysis, visibility, experience),
     methodology: {
       heading: "How RateReveal reviewed this statement",
@@ -284,7 +302,11 @@ function trustStrip(analysis: CanonicalStatementAnalysis, visibility: Visibility
   };
 }
 
-function composition(analysis: CanonicalStatementAnalysis, visibility: VisibilityCeiling): ProductionReportablePayload["composition"] {
+function composition(
+  analysis: CanonicalStatementAnalysis,
+  visibility: VisibilityCeiling,
+  findingCutover: AuthorityBackedFindingCutover,
+): ProductionReportablePayload["composition"] {
   if (!visibility.coreMetrics || !visibility.feeInventory || !visibility.ownershipActionability || !visibility.evidenceCalculations) return {
     heading: "Where your fees went",
     status: "omitted",
@@ -300,7 +322,9 @@ function composition(analysis: CanonicalStatementAnalysis, visibility: Visibilit
   const buckets = new Map<string, { label: string; amountMinor: number; rowCount: number }>();
   for (const row of safeChargeRows(analysis)) {
     const category = classification.get(row.id) ?? "unknown_needs_review";
-    const group = compositionGroup(category);
+    const group = findingCutover.feeRowIds.has(row.id)
+      ? AUTHORITY_BACKED_FINDING_COPY.compositionCategory
+      : compositionGroup(category);
     const existing = buckets.get(group.id) ?? { label: group.label, amountMinor: 0, rowCount: 0 };
     existing.amountMinor += contributionAmount(row).amountMinor;
     existing.rowCount += 1;
@@ -342,54 +366,75 @@ function findings(
   analysis: CanonicalStatementAnalysis,
   languageSource: ProductionMerchantLanguageSource,
   visibility: VisibilityCeiling,
+  findingCutover: AuthorityBackedFindingCutover,
 ): ProductionReportablePayload["priorityFindings"] {
   if (!visibility.feeInventory || !visibility.ownershipActionability || !visibility.customerExplanation) {
     return { heading: "What deserves attention", status: "omitted", items: [] };
   }
-  const items = analysis.merchantAttention.items.filter((item) => item.surfaceEligibility.priorityFinding).map((item) => ({
-    id: item.id,
-    attentionType: merchantAttentionType(item.attentionType),
-    priority: item.priority,
-    merchantTitle: customerCopy(item.merchantTitle),
-    observedLabel: item.originalObservedStatementLabel ? customerCopy(item.originalObservedStatementLabel) : null,
-    observedAmount: item.observedAmount,
-    category: categoryLabel(item.category),
-    likelyOwner: item.likelyOwner ? {
-      economicBeneficiary: partyLabel(item.likelyOwner.economicBeneficiary),
-      contractualController: partyLabel(item.likelyOwner.contractualController),
-    } : null,
-    evidenceStatus: evidenceStatusLabel(item.evidenceStatus),
-    confidence: item.confidence,
-    whyDeservesAttention: customerCopy(item.whyThisDeservesAttention),
-    whatStatementShows: customerCopy(item.originalObservedStatementLabel ? `${item.originalObservedStatementLabel} appears on this statement.` : item.whyThisDeservesAttention),
-    whatThisLikelyMeans: customerCopy(item.evidenceBoundary.reasonableConclusion.summary),
-    whatStillNeedsConfirmation: item.evidenceBoundary.remainingUncertainty.map(customerCopy),
-    safestNextAction: visibility.actions ? {
-      actionType: merchantActionType(item.safestNextAction.actionType),
-      instruction: customerCopy(item.safestNextAction.instruction),
-    } : null,
-    references: {
-      evidenceRefs: visibility.evidenceCalculations ? [...new Set([...item.evidenceRefs, ...item.evidenceBoundary.statementProof.evidenceRefs])] : [],
-      feeRowRefs: visibility.evidenceCalculations ? [...item.feeRowIds] : [],
-    },
-    opportunityLinkage: visibility.opportunityLinkage && item.opportunityLink ? {
-      componentRefs: [...item.opportunityLink.componentRefs],
-      linkageOnly: true as const,
-      moneyIncluded: false as const,
-    } : null,
-    languageSource: item.merchantLanguageSource === "admitted_ai_interpretation" ? "ai_assisted" as const : languageSource === "ai_assisted" ? "deterministic_fallback" as const : languageSource,
-  }));
+  const items = analysis.merchantAttention.items
+    .filter((item) => item.surfaceEligibility.priorityFinding
+      && (!findingCutover.itemIds.has(item.id) || findingCutover.materialItemIds.has(item.id)))
+    .map((item) => {
+      const useAuthorityBackedFinding = findingCutover.materialItemIds.has(item.id);
+      return {
+        id: item.id,
+        attentionType: useAuthorityBackedFinding
+          ? AUTHORITY_BACKED_FINDING_COPY.attentionType
+          : merchantAttentionType(item.attentionType),
+        priority: useAuthorityBackedFinding ? "high_priority" as const : item.priority,
+        merchantTitle: customerCopy(useAuthorityBackedFinding ? AUTHORITY_BACKED_FINDING_COPY.title : item.merchantTitle),
+        observedLabel: item.originalObservedStatementLabel ? customerCopy(item.originalObservedStatementLabel) : null,
+        observedAmount: item.observedAmount,
+        category: useAuthorityBackedFinding ? AUTHORITY_BACKED_FINDING_COPY.category : categoryLabel(item.category),
+        likelyOwner: useAuthorityBackedFinding ? null : item.likelyOwner ? {
+          economicBeneficiary: partyLabel(item.likelyOwner.economicBeneficiary),
+          contractualController: partyLabel(item.likelyOwner.contractualController),
+        } : null,
+        evidenceStatus: evidenceStatusLabel(item.evidenceStatus),
+        confidence: item.confidence,
+        whyDeservesAttention: customerCopy(useAuthorityBackedFinding
+          ? AUTHORITY_BACKED_FINDING_COPY.materialRationale
+          : item.whyThisDeservesAttention),
+        whatStatementShows: customerCopy(item.originalObservedStatementLabel ? `${item.originalObservedStatementLabel} appears on this statement.` : item.whyThisDeservesAttention),
+        whatThisLikelyMeans: customerCopy(useAuthorityBackedFinding
+          ? AUTHORITY_BACKED_FINDING_COPY.explanation
+          : item.evidenceBoundary.reasonableConclusion.summary),
+        whatStillNeedsConfirmation: item.evidenceBoundary.remainingUncertainty.map(customerCopy),
+        safestNextAction: visibility.actions ? {
+          actionType: merchantActionType(item.safestNextAction.actionType),
+          instruction: customerCopy(useAuthorityBackedFinding
+            ? AUTHORITY_BACKED_PRICING_EVIDENCE_COPY.whatToDo
+            : item.safestNextAction.instruction),
+        } : null,
+        references: {
+          evidenceRefs: visibility.evidenceCalculations ? [...new Set([...item.evidenceRefs, ...item.evidenceBoundary.statementProof.evidenceRefs])] : [],
+          feeRowRefs: visibility.evidenceCalculations ? [...item.feeRowIds] : [],
+        },
+        opportunityLinkage: visibility.opportunityLinkage && item.opportunityLink ? {
+          componentRefs: [...item.opportunityLink.componentRefs],
+          linkageOnly: true as const,
+          moneyIncluded: false as const,
+        } : null,
+        languageSource: item.merchantLanguageSource === "admitted_ai_interpretation" ? "ai_assisted" as const : languageSource === "ai_assisted" ? "deterministic_fallback" as const : languageSource,
+      };
+    });
   return { heading: "What deserves attention", status: items.length ? "shown" : "omitted", items };
 }
 
-function projectQuestions(analysis: CanonicalStatementAnalysis, visibility: VisibilityCeiling): ProductionReportablePayload["openQuestions"]["items"] {
+function projectQuestions(
+  analysis: CanonicalStatementAnalysis,
+  visibility: VisibilityCeiling,
+  findingCutover: AuthorityBackedFindingCutover,
+): ProductionReportablePayload["openQuestions"]["items"] {
   const questions: ProductionReportablePayload["openQuestions"]["items"] = visibility.feeInventory && visibility.ownershipActionability && visibility.customerExplanation
     ? analysis.merchantAttention.items.flatMap((item) => item.questionToResolve ? [{
     id: item.questionToResolve.questionId,
     question: customerCopy(item.questionToResolve.question),
     whatRateRevealKnows: customerCopy(item.questionToResolve.whatRateRevealKnows),
     whatRemainsUncertain: customerCopy(item.questionToResolve.whatRemainsUncertain),
-    safeNextStep: customerCopy(item.questionToResolve.safeNextStep),
+    safeNextStep: customerCopy(findingCutover.itemIds.has(item.id)
+      ? AUTHORITY_BACKED_PRICING_EVIDENCE_COPY.whatToDo
+      : item.questionToResolve.safeNextStep),
     requirement: item.questionToResolve.requirement,
     requiredEvidenceOrConfirmation: item.questionToResolve.requiredEvidenceOrConfirmation.map(customerCopy),
     references: {
@@ -419,7 +464,11 @@ function projectQuestions(analysis: CanonicalStatementAnalysis, visibility: Visi
   return questions;
 }
 
-function allCharges(analysis: CanonicalStatementAnalysis, visibility: VisibilityCeiling): ProductionReportablePayload["allCharges"] {
+function allCharges(
+  analysis: CanonicalStatementAnalysis,
+  visibility: VisibilityCeiling,
+  findingCutover: AuthorityBackedFindingCutover,
+): ProductionReportablePayload["allCharges"] {
   if (!visibility.feeInventory) return {
     heading: "All charges on this statement",
     status: "omitted",
@@ -434,7 +483,12 @@ function allCharges(analysis: CanonicalStatementAnalysis, visibility: Visibility
   const rows = inventoryRows(analysis).map((row) => {
     const attention = attentionByRow.get(row.id);
     const selected = classification.get(row.id);
-    const disposition = !visibility.ownershipActionability ? "informational" as const
+    const useAuthorityBackedFinding = findingCutover.feeRowIds.has(row.id);
+    const independentlyMaterial = findingCutover.materialFeeRowIds.has(row.id);
+    const disposition = !visibility.ownershipActionability || (useAuthorityBackedFinding && !independentlyMaterial)
+      ? "informational" as const
+      : useAuthorityBackedFinding
+        ? "attention" as const
       : attention?.inventoryDisposition === "unresolved_review" ? "unresolved" as const
       : attention?.surfaceEligibility.priorityFinding ? "attention" as const
       : attention?.inventoryDisposition === "routine_context" ? "routine" as const
@@ -443,19 +497,25 @@ function allCharges(analysis: CanonicalStatementAnalysis, visibility: Visibility
       id: row.id,
       label: customerCopy(row.selectedLabel),
       amount: contributionAmount(row),
-      category: visibility.ownershipActionability ? categoryLabel(selected?.category ?? "unknown_needs_review") : "unclassified",
-      likelyOwner: visibility.ownershipActionability && selected ? {
+      category: visibility.ownershipActionability
+        ? useAuthorityBackedFinding ? AUTHORITY_BACKED_FINDING_COPY.category : categoryLabel(selected?.category ?? "unknown_needs_review")
+        : "unclassified",
+      likelyOwner: useAuthorityBackedFinding ? null : visibility.ownershipActionability && selected ? {
         economicBeneficiary: partyLabel(selected.ownership.economicBeneficiary),
         contractualController: partyLabel(selected.ownership.contractualController),
       } : null,
-      whatRateRevealKnows: !visibility.customerExplanation ? null : attention
+      whatRateRevealKnows: !visibility.customerExplanation ? null : useAuthorityBackedFinding
+        ? AUTHORITY_BACKED_FINDING_COPY.explanation
+        : attention
         ? customerCopy(attention.evidenceBoundary.reasonableConclusion.summary)
         : "This charge is shown on the statement; no stronger conclusion is presented here.",
       evidenceStatus: evidenceStatusLabel(attention?.evidenceStatus ?? "statement_confirmed"),
       disposition,
       safestAction: visibility.actions && attention ? {
         actionType: merchantActionType(attention.safestNextAction.actionType),
-        instruction: customerCopy(attention.safestNextAction.instruction),
+        instruction: customerCopy(useAuthorityBackedFinding
+          ? AUTHORITY_BACKED_PRICING_EVIDENCE_COPY.whatToDo
+          : attention.safestNextAction.instruction),
       } : null,
       references: {
         evidenceRefs: visibility.evidenceCalculations ? [...row.contributionDecision.evidenceRefs] : [],
@@ -477,12 +537,12 @@ function allCharges(analysis: CanonicalStatementAnalysis, visibility: Visibility
 function nextActions(
   analysis: CanonicalStatementAnalysis,
   visibility: VisibilityCeiling,
-  authorityContext?: ProductionReportAuthorityContext,
+  findingCutover: AuthorityBackedFindingCutover,
 ): ProductionReportablePayload["nextActions"] {
   if (!visibility.actions || !visibility.ownershipActionability) {
     return { heading: "What to do next", status: "omitted", modules: [], guidance: null };
   }
-  const neutralPricingEvidenceItemIds = authorityBackedPricingEvidenceItemIds(authorityContext);
+  const neutralPricingEvidenceItemIds = findingCutover.itemIds;
   const modules = analysis.merchantAttention.items.filter((item) => item.surfaceEligibility.actionToolkit && item.actionToolkit).map((item) => {
     const toolkit = item.actionToolkit!;
     const useAuthorityBackedCopy = toolkit.actionType === "request_pricing_review"
@@ -508,26 +568,65 @@ function nextActions(
   return { heading: "What to do next", status: "omitted", modules: [], guidance: null };
 }
 
-function authorityBackedPricingEvidenceItemIds(
-  authorityContext?: ProductionReportAuthorityContext,
-): Set<string> {
-  const shadow = authorityContext?.merchantAttentionMarkupShadow;
-  if (!shadow || shadow.status !== "available") return new Set();
-  return new Set(shadow.rows.flatMap((row) => {
-    const attention = row.currentAttention;
-    return authorityBackedPricingEvidenceCopyEligible(row)
-      && attention?.actionType === "request_pricing_review"
-      ? [attention.itemId]
-      : [];
-  }));
-}
-
 export function authorityBackedPricingEvidenceCopyEligible(
   row: ProductionReportMarkupAuthorityRow,
 ): boolean {
   return row.currentSelected.category === "processor_markup"
     && row.authorityBackedSemantics.potentialNegotiation === "not_established"
     && row.authorityBackedSemantics.observedFeeComponent === "supported";
+}
+
+function authorityBackedFindingCutover(
+  analysis: CanonicalStatementAnalysis,
+  authorityContext?: ProductionReportAuthorityContext,
+): AuthorityBackedFindingCutover {
+  const result: AuthorityBackedFindingCutover = {
+    itemIds: new Set(),
+    feeRowIds: new Set(),
+    materialItemIds: new Set(),
+    materialFeeRowIds: new Set(),
+  };
+  const shadow = authorityContext?.merchantAttentionMarkupShadow;
+  if (!shadow || shadow.status !== "available") return result;
+
+  const classifications = new Map(analysis.feeOwnershipActionability.rowClassifications
+    .map((classification) => [classification.feeRowId, classification.selected.category]));
+  const feeRows = new Map(analysis.feeLedger.rows.map((row) => [row.id, row]));
+  const attentionItems = new Map(analysis.merchantAttention.items.map((item) => [item.id, item]));
+  const totalFees = analysis.financialFacts.totalFees.status === "selected"
+    ? analysis.financialFacts.totalFees.value
+    : null;
+
+  for (const row of shadow.rows) {
+    if (!authorityBackedPricingEvidenceCopyEligible(row)) continue;
+    const attentionRef = row.currentAttention;
+    const attention = attentionRef ? attentionItems.get(attentionRef.itemId) : null;
+    const feeRow = feeRows.get(row.feeRowId);
+    if (!attentionRef || !attention || !feeRow
+      || classifications.get(row.feeRowId) !== "processor_markup"
+      || attention.scope !== "fee_row"
+      || attention.attentionType !== "potential_negotiation"
+      || attention.safestNextAction.actionType !== "request_pricing_review"
+      || attentionRef.actionType !== "request_pricing_review"
+      || !attention.feeRowIds.includes(row.feeRowId)
+      || !feeRow.contributesToUniqueTotal
+      || !feeRow.contributionDecision.contributes
+      || contributionAmount(feeRow).amountMinor <= 0) continue;
+
+    result.itemIds.add(attention.id);
+    result.feeRowIds.add(feeRow.id);
+    if (independentlyMaterialObservedCharge(contributionAmount(feeRow), totalFees)) {
+      result.materialItemIds.add(attention.id);
+      result.materialFeeRowIds.add(feeRow.id);
+    }
+  }
+  return result;
+}
+
+function independentlyMaterialObservedCharge(amount: MoneyAmount, totalFees: MoneyAmount | null): boolean {
+  const amountMinor = Math.abs(amount.amountMinor);
+  const totalFeesMinor = Math.abs(totalFees?.amountMinor ?? 0);
+  return amountMinor >= Math.max(1_000, Math.round(totalFeesMinor * 0.15));
 }
 
 function cleanMonitoring(
