@@ -72,6 +72,13 @@ describe("F4 shadow migration", () => {
     const analysis = fixture();
     analysis.merchantAttention = buildCanonicalMerchantAttentionModel(analysis);
     const before = JSON.stringify(analysis);
+    const liveBefore = {
+      merchantAttention: structuredClone(analysis.merchantAttention),
+      opportunityEngine: structuredClone(analysis.opportunityEngine),
+      customerState: structuredClone(analysis.customerState),
+      feeLedger: structuredClone(analysis.feeLedger),
+      financialFacts: structuredClone(analysis.financialFacts),
+    };
     const row = analysis.feeLedger.rows[0]!;
     const internal = consumeInternalFeeSemantics(analysis);
     const shadow = internal.merchantAttentionMarkupShadow;
@@ -94,6 +101,13 @@ describe("F4 shadow migration", () => {
         f4: { processorMarkup: { status: "refused" }, economicBeneficiary: { status: "unknown" },
           contractualController: { status: "unknown" }, merchantFacingPriceController: { status: "unknown" },
           actionability: { status: "refused" }, observedFeeComponent: { status: "supported" } },
+        authorityBackedSemantics: {
+          standing: "internal_only", semanticAuthority: "claim_authority_f4",
+          observedFeeComponent: "supported", economicBeneficiary: "unknown",
+          contractualController: "unknown", merchantFacingPriceController: "unknown",
+          actionability: "not_established", potentialNegotiation: "not_established",
+          reasonCodes: ["f4_markup_refused", "f4_actionability_refused"],
+        },
         guidanceStatus: "authority_exceeding",
         neutralFallbackCandidate: { standing: "shadow_candidate_only", feeMeaning: "observed_fee_component",
           pricingQuestion: "unresolved", partyAndControl: "evidence_needed", actionability: "not_established" },
@@ -105,6 +119,7 @@ describe("F4 shadow migration", () => {
       "research_priority_uses_unsupported_actionability_premise",
     ]));
     expect(JSON.stringify(analysis)).toBe(before);
+    expect(analysis).toMatchObject(liveBefore);
 
     // A separate statement-level rate review must not become a markup-row comparison.
     const statementItem = { ...structuredClone(analysis.merchantAttention.items[0]!),
@@ -142,9 +157,42 @@ describe("F4 shadow migration", () => {
     expect(shadow).toMatchObject({
       status: "unavailable", summary: { legacyMarkupRows: 1, authorityExceeding: 1 },
       rows: [{ f4: { processorMarkup: { status: "unknown" }, observedFeeComponent: { status: "unknown" } },
+        authorityBackedSemantics: { observedFeeComponent: "unknown", economicBeneficiary: "unknown",
+          contractualController: "unknown", merchantFacingPriceController: "unknown",
+          actionability: "not_established", potentialNegotiation: "not_established",
+          reasonCodes: ["f4_markup_unknown", "f4_actionability_unknown"] },
         guidanceStatus: "authority_exceeding", neutralFallbackCandidate: { feeMeaning: "unknown" } }],
     });
     expect(JSON.stringify(analysis)).toBe(before);
+  });
+
+  it("does not infer negotiation or processor parties from only one supported F4 premise", () => {
+    const analysis = fixture();
+    analysis.merchantAttention = buildCanonicalMerchantAttentionModel(analysis);
+    const internal = consumeInternalFeeSemantics(analysis);
+    const report = evaluateF4Shadow({ analysis });
+    const actionabilitySupported = structuredClone(report);
+    const actionabilityDecision = actionabilitySupported.decisions.find((item) => item.key.endsWith(":actionability"));
+    if (!actionabilityDecision) throw new Error("Missing actionability decision");
+    actionabilityDecision.status = "supported";
+    const markupSupported = structuredClone(internal.processorMarkup);
+    markupSupported.rows[0]!.status = "supported";
+    const compare = (f4Report: typeof report, processorMarkup: typeof markupSupported) =>
+      compareMerchantAttentionMarkupShadow({ analysis, f4Report, processorMarkup,
+        observedFeeComponents: internal.observedFeeComponents }).rows[0]!.authorityBackedSemantics;
+
+    expect(compare(actionabilitySupported, internal.processorMarkup)).toMatchObject({
+      actionability: "supported", potentialNegotiation: "not_established", reasonCodes: ["f4_markup_refused"],
+    });
+    expect(compare(report, markupSupported)).toMatchObject({
+      actionability: "not_established", potentialNegotiation: "not_established",
+      reasonCodes: ["f4_actionability_refused"],
+    });
+    expect(compare(actionabilitySupported, markupSupported)).toMatchObject({
+      potentialNegotiation: "unassessed", economicBeneficiary: "unknown",
+      contractualController: "unknown", merchantFacingPriceController: "unknown",
+      reasonCodes: ["negotiation_not_independently_adjudicated"],
+    });
   });
 
   it("retires a legacy Package D markup positive only at the internal semantic read boundary", () => {

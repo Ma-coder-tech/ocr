@@ -65,6 +65,17 @@ export type MerchantAttentionMarkupShadowComparison = {
       actionability: AuthorityResult;
       observedFeeComponent: AuthorityResult;
     };
+    authorityBackedSemantics: {
+      standing: "internal_only";
+      semanticAuthority: "claim_authority_f4";
+      observedFeeComponent: "supported" | "unknown";
+      economicBeneficiary: "unknown";
+      contractualController: "unknown";
+      merchantFacingPriceController: "unknown";
+      actionability: "supported" | "not_established";
+      potentialNegotiation: "not_established" | "unassessed";
+      reasonCodes: string[];
+    };
     guidanceStatus: "agreement" | "authority_exceeding" | "no_attention_item";
     authorityExceedanceReasons: string[];
     neutralFallbackCandidate: null | {
@@ -174,6 +185,23 @@ export function compareMerchantAttentionMarkupShadow(input: {
         ? { status: component.status, reasonCodes: [...component.reasonCodes] }
         : { status: "unknown" as const, reasonCodes: ["f4_component_decision_missing"] },
     };
+    const negotiationReasonCodes = [
+      ...(f4.processorMarkup.status === "supported" ? [] : [`f4_markup_${f4.processorMarkup.status}`]),
+      ...(f4.actionability.status === "supported" ? [] : [`f4_actionability_${f4.actionability.status}`]),
+    ];
+    const authorityBackedSemantics: MerchantAttentionMarkupShadowComparison["rows"][number]["authorityBackedSemantics"] = {
+      standing: "internal_only",
+      semanticAuthority: "claim_authority_f4",
+      observedFeeComponent: f4.observedFeeComponent.status === "supported" ? "supported" : "unknown",
+      // F4's party decisions do not bind a party value. A supported status alone cannot name the processor.
+      economicBeneficiary: "unknown",
+      contractualController: "unknown",
+      merchantFacingPriceController: "unknown",
+      actionability: f4.actionability.status === "supported" ? "supported" : "not_established",
+      // F4 adjudicates the premises, not negotiability itself. Even complete premises do not grant that claim.
+      potentialNegotiation: negotiationReasonCodes.length ? "not_established" : "unassessed",
+      reasonCodes: negotiationReasonCodes.length ? negotiationReasonCodes : ["negotiation_not_independently_adjudicated"],
+    };
     const currentAttention = attention ? {
       itemId: attention.id,
       category: attention.category,
@@ -244,6 +272,7 @@ export function compareMerchantAttentionMarkupShadow(input: {
       currentAttention,
       researchPriorityEffect: effect,
       f4,
+      authorityBackedSemantics,
       guidanceStatus,
       authorityExceedanceReasons: reasons,
       neutralFallbackCandidate: guidanceStatus !== "authority_exceeding" ? null : {
