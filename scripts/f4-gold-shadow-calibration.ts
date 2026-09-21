@@ -142,8 +142,22 @@ for (const fixture of fixtures) {
       || row.f4.observedFeeComponent.status !== "supported"
       || row.currentAttention?.attentionType !== "potential_negotiation"
       || row.currentAttention.actionType !== "request_pricing_review"
+      || row.authorityBackedSemantics.potentialNegotiation !== "not_established"
+      || row.authorityBackedSemantics.observedFeeComponent !== "supported"
+      || row.authorityBackedSemantics.economicBeneficiary !== "unknown"
+      || row.authorityBackedSemantics.contractualController !== "unknown"
+      || row.authorityBackedSemantics.merchantFacingPriceController !== "unknown"
+      || row.authorityBackedSemantics.actionability !== "not_established"
       || row.neutralFallbackCandidate?.feeMeaning !== "observed_fee_component"))
     throw new Error(`Merchant-attention markup shadow diverged for ${fixture.caseId}`);
+  const internalRetirement = {
+    negotiationNotEstablished: attentionShadow.rows.filter((row) => row.authorityBackedSemantics.potentialNegotiation === "not_established").length,
+    observedComponentSupported: attentionShadow.rows.filter((row) => row.authorityBackedSemantics.observedFeeComponent === "supported").length,
+    ownerUnknown: attentionShadow.rows.filter((row) => row.authorityBackedSemantics.economicBeneficiary === "unknown").length,
+    contractualControllerUnknown: attentionShadow.rows.filter((row) => row.authorityBackedSemantics.contractualController === "unknown").length,
+    priceControllerUnknown: attentionShadow.rows.filter((row) => row.authorityBackedSemantics.merchantFacingPriceController === "unknown").length,
+    actionabilityNotEstablished: attentionShadow.rows.filter((row) => row.authorityBackedSemantics.actionability === "not_established").length,
+  };
   if (report.publicProbe !== null || report.decisions.some((item) => item.status === "supported"
     && item.semanticCode !== "merchant_facing_fee_component"))
     throw new Error(`F4 Gold calibration produced an out-of-scope positive claim for ${fixture.caseId}`);
@@ -180,6 +194,7 @@ for (const fixture of fixtures) {
     componentUnknownByRole: Object.fromEntries(Object.entries(componentUnknownByRole).sort(([a], [b]) => a.localeCompare(b))),
     internalMarkup: internalMarkup.comparison,
     merchantAttentionMarkupShadow: attentionShadow.summary,
+    internalMerchantAttentionRetirement: internalRetirement,
     completeness: {
       savingsMissingStatementTotal: report.decisions.filter((item) => item.dimension === "savings" && item.missingGates.includes("statement_total")).length,
       savingsMissingFeeComposition: report.decisions.filter((item) => item.dimension === "savings" && item.missingGates.includes("fee_composition")).length,
@@ -196,6 +211,10 @@ const merchantAttentionMarkupShadowTotals = {
   legacyMarkupRows: 0, agreement: 0, authorityExceeding: 0, noAttentionItem: 0,
   observedComponentSupported: 0, currentResearchQuestions: 0, selectedResearchQuestions: 0,
 };
+const internalMerchantAttentionRetirementTotals = {
+  negotiationNotEstablished: 0, observedComponentSupported: 0, ownerUnknown: 0,
+  contractualControllerUnknown: 0, priceControllerUnknown: 0, actionabilityNotEstablished: 0,
+};
 for (const item of cases) {
   for (const basis of ["exact", "proxy"] as const) {
     for (const [relation, count] of Object.entries(item.comparisons[basis]))
@@ -205,6 +224,8 @@ for (const item of cases) {
     internalMarkupTotals[key] += item.internalMarkup[key];
   for (const key of Object.keys(merchantAttentionMarkupShadowTotals) as Array<keyof typeof merchantAttentionMarkupShadowTotals>)
     merchantAttentionMarkupShadowTotals[key] += item.merchantAttentionMarkupShadow[key];
+  for (const key of Object.keys(internalMerchantAttentionRetirementTotals) as Array<keyof typeof internalMerchantAttentionRetirementTotals>)
+    internalMerchantAttentionRetirementTotals[key] += item.internalMerchantAttentionRetirement[key];
 }
 for (const basis of ["exact", "proxy"] as const)
   totals[basis] = Object.fromEntries(Object.entries(totals[basis]).sort(([a], [b]) => a.localeCompare(b)));
@@ -217,6 +238,8 @@ if (merchantAttentionMarkupShadowTotals.legacyMarkupRows !== 24
   || merchantAttentionMarkupShadowTotals.noAttentionItem !== 0
   || merchantAttentionMarkupShadowTotals.observedComponentSupported !== 24)
   throw new Error("F4 provisional calibration merchant-attention shadow count changed");
+if (Object.values(internalMerchantAttentionRetirementTotals).some((count) => count !== 24))
+  throw new Error("F4 provisional calibration internal merchant-attention retirement count changed");
 
 const result = {
   schemaVersion: "f4_gold_shadow_calibration_v1",
@@ -228,6 +251,6 @@ const result = {
     { caseId: "G6", reason: "exact_source_identity_and_mapping_unresolved" },
     { caseId: "G9", reason: "original_gold_source_unavailable" },
   ],
-  totals, internalMarkupTotals, merchantAttentionMarkupShadowTotals, cases,
+  totals, internalMarkupTotals, merchantAttentionMarkupShadowTotals, internalMerchantAttentionRetirementTotals, cases,
 };
 process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);

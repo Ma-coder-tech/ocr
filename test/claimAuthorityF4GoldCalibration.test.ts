@@ -20,6 +20,14 @@ describe("F4 provisional real Gold fixture calibration", () => {
         exact: { agreement: 850, stronger_refusal: 24, unresolved_unknown: 714 },
         proxy: { agreement: 1121, stronger_refusal: 54, unresolved_unknown: 23 },
       },
+      internalMerchantAttentionRetirementTotals: {
+        negotiationNotEstablished: 24,
+        observedComponentSupported: 24,
+        ownerUnknown: 24,
+        contractualControllerUnknown: 24,
+        priceControllerUnknown: 24,
+        actionabilityNotEstablished: 24,
+      },
     });
     expect(report.cases).toHaveLength(7);
     expect(report.cases.every((item: any) => item.canonicalStatus === "valid"
