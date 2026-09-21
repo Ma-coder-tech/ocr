@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { admitMerchantAttentionAiInterpretation } from "../../src/canonical/merchantAttentionAiInterpretation.js";
 import { buildProductionReportProjection } from "../../src/canonical/productionReportProjection.js";
+import { consumeInternalFeeSemantics } from "../../src/claimAuthorityF4/observedFeeComponentConsumer.js";
 import {
   validateProductionReportProjection,
   validateProductionReportProjectionAgainstCanonical,
@@ -46,6 +47,71 @@ describe("Package 3 production report projection", () => {
     expect(report.report!.openQuestions.items.every((item) => item.amountIsSavings === false)).toBe(true);
     expect(new Set(report.report!.allCharges.rows.map((row) => row.disposition))).toEqual(new Set(["attention", "unresolved", "routine"]));
     expect(report.report!.nextActions.status).toBe("shown");
+  });
+
+  it("uses authority-backed neutral Action Toolkit copy only for an eligible Package D markup row", () => {
+    const analysis = package3Analysis([
+      { label: "PROCESSOR MARKUP", amount: 100 },
+      { label: "ADDITIONAL FEES", amount: 9.48 },
+    ]);
+    const canonicalBefore = JSON.stringify(analysis);
+    const semantics = consumeInternalFeeSemantics(analysis);
+    const shadow = semantics.merchantAttentionMarkupShadow;
+    const eligible = shadow.rows.filter((row) => row.authorityBackedSemantics.potentialNegotiation === "not_established"
+      && row.authorityBackedSemantics.observedFeeComponent === "supported");
+    expect(eligible).toHaveLength(1);
+    expect(eligible[0]).toMatchObject({
+      currentSelected: { category: "processor_markup" },
+      currentAttention: { attentionType: "potential_negotiation", actionType: "request_pricing_review" },
+    });
+
+    const legacy = buildProductionReportProjection(analysis);
+    const projected = buildProductionReportProjection(analysis, { merchantAttentionMarkupShadow: shadow });
+    const attentionItem = analysis.merchantAttention.items.find((item) => item.id === eligible[0]!.currentAttention!.itemId)!;
+    const moduleId = attentionItem.actionToolkit!.moduleId;
+    const beforeModule = legacy.report!.nextActions.modules.find((module) => module.id === moduleId)!;
+    const afterModule = projected.report!.nextActions.modules.find((module) => module.id === moduleId)!;
+
+    expect(beforeModule).toMatchObject({
+      actionType: "request_pricing_review",
+      whatToDo: "Ask the processor to review the account's current pricing and provide the current pricing schedule.",
+      why: "The accepted pricing and ownership context supports review, but the statement alone does not establish an overcharge.",
+      exactAsk: "Please review the account's current pricing and provide the current pricing schedule and an explanation of the processor-controlled components.",
+    });
+    expect(afterModule).toMatchObject({
+      actionType: "request_pricing_review",
+      title: "Request the current pricing agreement or schedule and a written explanation of this charge.",
+      whatToDo: "Request the current pricing agreement or schedule and a written explanation of this charge.",
+      why: "The statement confirms the charge, but its pricing basis, responsible party, and actionability are not established.",
+      exactAsk: "Please provide the current pricing agreement or schedule and identify the term that applies to this charge.",
+    });
+    expect(Object.keys(afterModule)).toEqual(Object.keys(beforeModule));
+
+    const outsideGateModuleId = analysis.merchantAttention.items.find((item) => item.feeRowIds.some((rowId) =>
+      analysis.feeLedger.rows.find((row) => row.id === rowId)?.selectedLabel === "ADDITIONAL FEES"))?.actionToolkit?.moduleId;
+    expect(outsideGateModuleId).toBeTruthy();
+    expect(projected.report!.nextActions.modules.find((module) => module.id === outsideGateModuleId))
+      .toEqual(legacy.report!.nextActions.modules.find((module) => module.id === outsideGateModuleId));
+
+    const projectedWithLegacyCopy = structuredClone(projected);
+    const restored = projectedWithLegacyCopy.report!.nextActions.modules.find((module) => module.id === moduleId)!;
+    restored.title = beforeModule.title;
+    restored.whatToDo = beforeModule.whatToDo;
+    restored.why = beforeModule.why;
+    restored.exactAsk = beforeModule.exactAsk;
+    expect(projectedWithLegacyCopy).toEqual(legacy);
+    expect(JSON.stringify(analysis)).toBe(canonicalBefore);
+  });
+
+  it.each([
+    ["negotiation is not authority-backed", { potentialNegotiation: "unassessed" as const }],
+    ["the observed fee component is not supported", { observedFeeComponent: "unknown" as const }],
+  ])("retains legacy Action Toolkit copy when %s", (_label, authorityOverride) => {
+    const analysis = package3Analysis([{ label: "PROCESSOR MARKUP", amount: 100 }]);
+    const shadow = structuredClone(consumeInternalFeeSemantics(analysis).merchantAttentionMarkupShadow);
+    Object.assign(shadow.rows[0]!.authorityBackedSemantics, authorityOverride);
+    expect(buildProductionReportProjection(analysis, { merchantAttentionMarkupShadow: shadow }))
+      .toEqual(buildProductionReportProjection(analysis));
   });
 
   it("projects the complete merchant-safe State Lab meaning without requiring canonical reconstruction", () => {
