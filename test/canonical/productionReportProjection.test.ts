@@ -49,7 +49,7 @@ describe("Package 3 production report projection", () => {
     expect(report.report!.nextActions.status).toBe("shown");
   });
 
-  it("uses authority-backed neutral Action Toolkit copy only for an eligible Package D markup row", () => {
+  it("projects one coherent neutral finding bundle for an independently material authority-gated markup row", () => {
     const analysis = package3Analysis([
       { label: "PROCESSOR MARKUP", amount: 100 },
       { label: "ADDITIONAL FEES", amount: 9.48 },
@@ -71,6 +71,13 @@ describe("Package 3 production report projection", () => {
     const moduleId = attentionItem.actionToolkit!.moduleId;
     const beforeModule = legacy.report!.nextActions.modules.find((module) => module.id === moduleId)!;
     const afterModule = projected.report!.nextActions.modules.find((module) => module.id === moduleId)!;
+    const beforeFinding = legacy.report!.priorityFindings.items.find((item) => item.id === attentionItem.id)!;
+    const afterFinding = projected.report!.priorityFindings.items.find((item) => item.id === attentionItem.id)!;
+    const feeRowId = attentionItem.feeRowIds[0]!;
+    const beforeCharge = legacy.report!.allCharges.rows.find((row) => row.id === feeRowId)!;
+    const afterCharge = projected.report!.allCharges.rows.find((row) => row.id === feeRowId)!;
+    const beforeQuestion = legacy.report!.openQuestions.items.find((item) => item.id === attentionItem.questionToResolve!.questionId)!;
+    const afterQuestion = projected.report!.openQuestions.items.find((item) => item.id === attentionItem.questionToResolve!.questionId)!;
 
     expect(beforeModule).toMatchObject({
       actionType: "request_pricing_review",
@@ -86,20 +93,113 @@ describe("Package 3 production report projection", () => {
       exactAsk: "Please provide the current pricing agreement or schedule and identify the term that applies to this charge.",
     });
     expect(Object.keys(afterModule)).toEqual(Object.keys(beforeModule));
+    expect(afterFinding).toMatchObject({
+      attentionType: "unresolved_pricing_question",
+      priority: "high_priority",
+      merchantTitle: "Pricing basis for this charge needs clarification",
+      observedLabel: beforeFinding.observedLabel,
+      observedAmount: beforeFinding.observedAmount,
+      category: "Observed fee component",
+      likelyOwner: null,
+      whyDeservesAttention: "This observed charge is materially significant, and its pricing basis needs supporting evidence.",
+      whatThisLikelyMeans: "This statement includes this fee component. Its pricing basis, responsible party, and actionability are not established.",
+      safestNextAction: {
+        actionType: "request_pricing_review",
+        instruction: "Request the current pricing agreement or schedule and a written explanation of this charge.",
+      },
+    });
+    expect(afterFinding.references).toEqual(beforeFinding.references);
+    expect(afterFinding.opportunityLinkage).toEqual(beforeFinding.opportunityLinkage);
+    expect(Object.keys(afterFinding)).toEqual(Object.keys(beforeFinding));
+    expect(afterCharge).toMatchObject({
+      label: beforeCharge.label,
+      amount: beforeCharge.amount,
+      category: "Observed fee component",
+      likelyOwner: null,
+      whatRateRevealKnows: "This statement includes this fee component. Its pricing basis, responsible party, and actionability are not established.",
+      disposition: "attention",
+      safestAction: {
+        actionType: "request_pricing_review",
+        instruction: "Request the current pricing agreement or schedule and a written explanation of this charge.",
+      },
+    });
+    expect(afterCharge.references).toEqual(beforeCharge.references);
+    expect(Object.keys(afterCharge)).toEqual(Object.keys(beforeCharge));
+    expect(afterQuestion.question).toBe(beforeQuestion.question);
+    expect(afterQuestion.requirement).toBe(beforeQuestion.requirement);
+    expect(afterQuestion.requiredEvidenceOrConfirmation).toEqual(beforeQuestion.requiredEvidenceOrConfirmation);
+    expect(afterQuestion.safeNextStep).toBe("Request the current pricing agreement or schedule and a written explanation of this charge.");
+    expect(projected.report!.composition.categories).toContainEqual({
+      id: "observed_fee_components",
+      label: "Observed fee components",
+      amount: beforeCharge.amount,
+      rowCount: 1,
+    });
+    expect(projected.report!.composition.representedTotal).toEqual(legacy.report!.composition.representedTotal);
+    expect(projected.report!.composition.statementFeeTotal).toEqual(legacy.report!.composition.statementFeeTotal);
+    expect(projected.report!.composition.difference).toEqual(legacy.report!.composition.difference);
 
     const outsideGateModuleId = analysis.merchantAttention.items.find((item) => item.feeRowIds.some((rowId) =>
       analysis.feeLedger.rows.find((row) => row.id === rowId)?.selectedLabel === "ADDITIONAL FEES"))?.actionToolkit?.moduleId;
     expect(outsideGateModuleId).toBeTruthy();
     expect(projected.report!.nextActions.modules.find((module) => module.id === outsideGateModuleId))
       .toEqual(legacy.report!.nextActions.modules.find((module) => module.id === outsideGateModuleId));
+    const outsideGateRowId = analysis.feeLedger.rows.find((row) => row.selectedLabel === "ADDITIONAL FEES")!.id;
+    expect(projected.report!.allCharges.rows.find((row) => row.id === outsideGateRowId))
+      .toEqual(legacy.report!.allCharges.rows.find((row) => row.id === outsideGateRowId));
 
-    const projectedWithLegacyCopy = structuredClone(projected);
-    const restored = projectedWithLegacyCopy.report!.nextActions.modules.find((module) => module.id === moduleId)!;
-    restored.title = beforeModule.title;
-    restored.whatToDo = beforeModule.whatToDo;
-    restored.why = beforeModule.why;
-    restored.exactAsk = beforeModule.exactAsk;
-    expect(projectedWithLegacyCopy).toEqual(legacy);
+    expect(JSON.stringify(analysis)).toBe(canonicalBefore);
+  });
+
+  it("keeps a non-material gated charge visible for evidence collection without elevating it as a finding", () => {
+    const analysis = package3Analysis([
+      { label: "PROCESSOR MARKUP", amount: 9 },
+      { label: "VISA INTERCHANGE", amount: 91, section: "Interchange Charges" },
+    ]);
+    const canonicalBefore = JSON.stringify(analysis);
+    const protectedBefore = structuredClone({
+      financialFacts: analysis.financialFacts,
+      merchantAttention: analysis.merchantAttention,
+      opportunityEngine: analysis.opportunityEngine,
+      customerState: analysis.customerState,
+    });
+    const shadow = consumeInternalFeeSemantics(analysis).merchantAttentionMarkupShadow;
+    const eligible = shadow.rows.find((row) => row.currentAttention?.attentionType === "potential_negotiation")!;
+    const itemId = eligible.currentAttention!.itemId;
+    const projected = buildProductionReportProjection(analysis, { merchantAttentionMarkupShadow: shadow });
+    const charge = projected.report!.allCharges.rows.find((row) => row.id === eligible.feeRowId)!;
+    const question = projected.report!.openQuestions.items.find((item) => item.references.feeRowRefs.includes(eligible.feeRowId))!;
+    const module = projected.report!.nextActions.modules.find((item) => item.id.includes(itemId))!;
+
+    expect(projected.report!.priorityFindings.items.some((item) => item.id === itemId)).toBe(false);
+    expect(charge).toMatchObject({
+      label: "PROCESSOR MARKUP",
+      amount: { amountMinor: 900, currency: "USD" },
+      category: "Observed fee component",
+      likelyOwner: null,
+      disposition: "informational",
+      safestAction: { actionType: "request_pricing_review" },
+    });
+    expect(question).toMatchObject({
+      question: "How does this charge compare with the current merchant pricing agreement?",
+      requirement: "merchant_pricing_agreement_required",
+      requiredEvidenceOrConfirmation: ["Current merchant pricing agreement or pricing schedule"],
+      safeNextStep: "Request the current pricing agreement or schedule and a written explanation of this charge.",
+    });
+    expect(module).toMatchObject({
+      actionType: "request_pricing_review",
+      whatToDo: "Request the current pricing agreement or schedule and a written explanation of this charge.",
+    });
+    expect(projected.report!.composition.categories).toContainEqual(expect.objectContaining({
+      id: "observed_fee_components",
+      amount: { amountMinor: 900, currency: "USD" },
+    }));
+    expect({
+      financialFacts: analysis.financialFacts,
+      merchantAttention: analysis.merchantAttention,
+      opportunityEngine: analysis.opportunityEngine,
+      customerState: analysis.customerState,
+    }).toEqual(protectedBefore);
     expect(JSON.stringify(analysis)).toBe(canonicalBefore);
   });
 
