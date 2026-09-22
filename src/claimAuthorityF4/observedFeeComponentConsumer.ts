@@ -5,6 +5,11 @@ import {
   compareMerchantAttentionMarkupShadow,
   type MerchantAttentionMarkupShadowComparison,
 } from "./merchantAttentionShadowComparison.js";
+import {
+  buildPackageECustomerStateAuthorityReadBoundary,
+  type PackageECustomerStateAuthorityReadBoundary,
+  unavailablePackageECustomerStateAuthorityReadBoundary,
+} from "./packageECustomerStateAuthorityReadBoundary.js";
 
 /** Internal semantic state. It grants no ownership, pricing, actionability, or customer permission. */
 export type InternalObservedFeeComponents = {
@@ -48,6 +53,7 @@ export type InternalFeeSemantics = {
   observedFeeComponents: InternalObservedFeeComponents;
   processorMarkup: InternalProcessorMarkupSemantics;
   merchantAttentionMarkupShadow: MerchantAttentionMarkupShadowComparison;
+  packageECustomerStateAuthorityReadBoundary: PackageECustomerStateAuthorityReadBoundary;
 };
 
 export function processorMarkupStatusFromF4(decision: F4ShadowDecision | undefined):
@@ -194,10 +200,23 @@ export function consumeInternalFeeSemantics(analysis: CanonicalStatementAnalysis
       },
     };
   }
+  let packageECustomerStateAuthorityReadBoundary: PackageECustomerStateAuthorityReadBoundary;
+  try {
+    packageECustomerStateAuthorityReadBoundary = buildPackageECustomerStateAuthorityReadBoundary({
+      analysis,
+      merchantAttentionMarkupShadow,
+    });
+  } catch {
+    // This read-only diagnostic must never block canonical analysis or customer projections.
+    packageECustomerStateAuthorityReadBoundary = unavailablePackageECustomerStateAuthorityReadBoundary(
+      merchantAttentionMarkupShadow.sourceReportId,
+    );
+  }
   return {
     observedFeeComponents,
     processorMarkup,
     merchantAttentionMarkupShadow,
+    packageECustomerStateAuthorityReadBoundary,
   };
 }
 

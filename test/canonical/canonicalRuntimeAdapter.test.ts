@@ -69,9 +69,16 @@ describe("canonical runtime adapter", () => {
       standing: "internal_diagnostic_only",
       status: "available",
     });
+    expect(result.internalPackageECustomerStateAuthorityReadBoundary).toMatchObject({
+      standing: "internal_diagnostic_only",
+      semanticAuthority: "claim_authority_f4",
+      status: "available",
+      summary: { positiveOpportunityAuthority: 0, positiveSavingsAuthority: 0, eligibleSavingsAmountMinor: 0 },
+    });
     expect(JSON.stringify(result.analysis)).not.toContain("internalObservedFeeComponents");
     expect(JSON.stringify(result.analysis)).not.toContain("internalProcessorMarkupSemantics");
     expect(JSON.stringify(result.analysis)).not.toContain("internalMerchantAttentionMarkupShadow");
+    expect(JSON.stringify(result.analysis)).not.toContain("internalPackageECustomerStateAuthorityReadBoundary");
   });
 
   it("does not use filenames, paths, or malformed refs as canonical runtime identity", () => {
