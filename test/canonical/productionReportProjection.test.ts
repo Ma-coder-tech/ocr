@@ -86,7 +86,7 @@ describe("Package 3 production report projection", () => {
       exactAsk: "Please review the account's current pricing and provide the current pricing schedule and an explanation of the processor-controlled components.",
     });
     expect(afterModule).toMatchObject({
-      actionType: "request_pricing_review",
+      actionType: "request_explanation",
       title: "Request the current pricing agreement or schedule and a written explanation of this charge.",
       whatToDo: "Request the current pricing agreement or schedule and a written explanation of this charge.",
       why: "The statement confirms the charge, but its pricing basis, responsible party, and actionability are not established.",
@@ -104,7 +104,7 @@ describe("Package 3 production report projection", () => {
       whyDeservesAttention: "This observed charge is materially significant, and its pricing basis needs supporting evidence.",
       whatThisLikelyMeans: "This statement includes this fee component. Its pricing basis, responsible party, and actionability are not established.",
       safestNextAction: {
-        actionType: "request_pricing_review",
+        actionType: "request_explanation",
         instruction: "Request the current pricing agreement or schedule and a written explanation of this charge.",
       },
     });
@@ -119,7 +119,7 @@ describe("Package 3 production report projection", () => {
       whatRateRevealKnows: "This statement includes this fee component. Its pricing basis, responsible party, and actionability are not established.",
       disposition: "attention",
       safestAction: {
-        actionType: "request_pricing_review",
+        actionType: "request_explanation",
         instruction: "Request the current pricing agreement or schedule and a written explanation of this charge.",
       },
     });
@@ -178,7 +178,7 @@ describe("Package 3 production report projection", () => {
       category: "Observed fee component",
       likelyOwner: null,
       disposition: "informational",
-      safestAction: { actionType: "request_pricing_review" },
+      safestAction: { actionType: "request_explanation" },
     });
     expect(question).toMatchObject({
       question: "How does this charge compare with the current merchant pricing agreement?",
@@ -187,7 +187,7 @@ describe("Package 3 production report projection", () => {
       safeNextStep: "Request the current pricing agreement or schedule and a written explanation of this charge.",
     });
     expect(module).toMatchObject({
-      actionType: "request_pricing_review",
+      actionType: "request_explanation",
       whatToDo: "Request the current pricing agreement or schedule and a written explanation of this charge.",
     });
     expect(projected.report!.composition.categories).toContainEqual(expect.objectContaining({

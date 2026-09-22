@@ -42,6 +42,8 @@ const AUTHORITY_BACKED_PRICING_EVIDENCE_COPY = {
   exactAsk: "Please provide the current pricing agreement or schedule and identify the term that applies to this charge.",
 } as const;
 
+const AUTHORITY_BACKED_PRICING_EVIDENCE_ACTION_TYPE = "request_explanation" as const;
+
 const AUTHORITY_BACKED_FINDING_COPY = {
   attentionType: "unresolved_pricing_question",
   title: "Pricing basis for this charge needs clarification",
@@ -401,7 +403,9 @@ function findings(
           : item.evidenceBoundary.reasonableConclusion.summary),
         whatStillNeedsConfirmation: item.evidenceBoundary.remainingUncertainty.map(customerCopy),
         safestNextAction: visibility.actions ? {
-          actionType: merchantActionType(item.safestNextAction.actionType),
+          actionType: useAuthorityBackedFinding
+            ? AUTHORITY_BACKED_PRICING_EVIDENCE_ACTION_TYPE
+            : merchantActionType(item.safestNextAction.actionType),
           instruction: customerCopy(useAuthorityBackedFinding
             ? AUTHORITY_BACKED_PRICING_EVIDENCE_COPY.whatToDo
             : item.safestNextAction.instruction),
@@ -512,7 +516,9 @@ function allCharges(
       evidenceStatus: evidenceStatusLabel(attention?.evidenceStatus ?? "statement_confirmed"),
       disposition,
       safestAction: visibility.actions && attention ? {
-        actionType: merchantActionType(attention.safestNextAction.actionType),
+        actionType: useAuthorityBackedFinding
+          ? AUTHORITY_BACKED_PRICING_EVIDENCE_ACTION_TYPE
+          : merchantActionType(attention.safestNextAction.actionType),
         instruction: customerCopy(useAuthorityBackedFinding
           ? AUTHORITY_BACKED_PRICING_EVIDENCE_COPY.whatToDo
           : attention.safestNextAction.instruction),
@@ -550,7 +556,9 @@ function nextActions(
     const whatToDo = useAuthorityBackedCopy ? AUTHORITY_BACKED_PRICING_EVIDENCE_COPY.whatToDo : toolkit.whatToDo;
     return {
       id: toolkit.moduleId,
-      actionType: merchantActionType(toolkit.actionType),
+      actionType: useAuthorityBackedCopy
+        ? AUTHORITY_BACKED_PRICING_EVIDENCE_ACTION_TYPE
+        : merchantActionType(toolkit.actionType),
       title: toolkit.actionType === "request_itemization" ? "Ask for a breakdown" : customerCopy(whatToDo),
       whatToDo: customerCopy(whatToDo),
       why: customerCopy(useAuthorityBackedCopy ? AUTHORITY_BACKED_PRICING_EVIDENCE_COPY.why : toolkit.why),
