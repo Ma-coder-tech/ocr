@@ -5,6 +5,8 @@ import { buildCanonicalStatementFactsFromParsedDocument } from "../src/canonical
 import { buildCanonicalFeeOwnershipActionability } from "../src/canonical/feeOwnershipActionability.js";
 import { buildCanonicalFeeLedger } from "../src/canonical/feeLedger.js";
 import { buildCanonicalMerchantAttentionModel } from "../src/canonical/merchantAttention.js";
+import { buildCanonicalOpportunityEngine } from "../src/canonical/opportunityEngine.js";
+import { buildCanonicalCustomerState } from "../src/canonical/customerStateResolver.js";
 import type { CanonicalStatementAnalysis } from "../src/canonical/types.js";
 import { buildF4DecisionGraph, evaluateF4Shadow, tryEvaluateF4Shadow } from "../src/claimAuthorityF4/shadow.js";
 import {
@@ -51,6 +53,21 @@ function fixture(): CanonicalStatementAnalysis {
     candidates: [{ id: "f4_synthetic_period", role: "user_supplied", value: period, evidenceRefs: [],
       parserId: null, parserVersion: null, extractionMethod: "manual_input", confidence: "high",
       selected: true, selectionReason: "synthetic_test_period", rejectionReason: null }], limitations: [] };
+  analysis.opportunityEngine = buildCanonicalOpportunityEngine({
+    feeLedger: analysis.feeLedger,
+    feeOwnershipActionability: analysis.feeOwnershipActionability,
+    evidence: analysis.evidence,
+    statementPeriodVerified: true,
+  });
+  analysis.customerState = buildCanonicalCustomerState({
+    identity: analysis.identity,
+    financialFacts: analysis.financialFacts,
+    feeLedger: analysis.feeLedger,
+    feeOwnershipActionability: analysis.feeOwnershipActionability,
+    opportunityEngine: analysis.opportunityEngine,
+    aiCapabilities: analysis.aiCapabilities,
+    rateComparison: analysis.customerState.rateComparison,
+  });
   return analysis;
 }
 
@@ -118,6 +135,69 @@ describe("F4 shadow migration", () => {
       "processor_contractual_controller_without_f4_authority", "research_priority_uses_unsupported_markup_premise",
       "research_priority_uses_unsupported_actionability_premise",
     ]));
+    const packageERead = internal.packageECustomerStateAuthorityReadBoundary;
+    const packageEComponent = analysis.opportunityEngine.components.find((component) =>
+      component.kind === "fee_row_review" && component.feeRowRefs.some((ref) => ref.feeRowId === row.id));
+    expect(packageEComponent).toBeDefined();
+    expect(packageERead).toMatchObject({
+      version: "package_e_customer_state_authority_read_boundary_v1",
+      standing: "internal_diagnostic_only",
+      semanticAuthority: "claim_authority_f4",
+      status: "available",
+      summary: {
+        gatedRows: 1, modeledRows: 1, unmatchedRows: 0,
+        ownerUnknown: 1, controllerUnknown: 1, actionabilityNotEstablished: 1,
+        feeRowReviewPreserved: 1, observedAmountPreserved: 1, evidencePreserved: 1, masterSavingsUnchanged: 1,
+        verificationOnlyEvidenceReview: 1, neutralRequestExplanationCandidates: 1,
+        positiveOpportunityAuthority: 0, positiveSavingsAuthority: 0, eligibleSavingsAmountMinor: 0,
+      },
+      rows: [{
+        feeRowId: row.id,
+        opportunityComponentId: packageEComponent?.id,
+        gate: { legacyPackageDCategory: "processor_markup", observedFeeComponent: "supported",
+          processorMarkup: "refused", actionability: "refused", potentialNegotiation: "not_established" },
+        legacyComparison: {
+          packageE: { kind: "fee_row_review", ownership: { collector: "processor",
+            economicBeneficiary: "processor", contractualController: "processor" },
+          actionabilityCeiling: "potentially_actionable", eligibility: "verification_only",
+          observedAmount: packageEComponent?.observedAmount, evidenceRefs: packageEComponent?.evidenceRefs },
+          preliminaryActionTypes: ["verify_charge"],
+        },
+        authorityBacked: {
+          ownership: { collector: "unknown", economicBeneficiary: "unknown", contractualController: "unknown" },
+          actionability: "not_established",
+          opportunityKind: "fee_row_review", observedAmount: packageEComponent?.observedAmount,
+          evidenceRefs: packageEComponent?.evidenceRefs,
+          verificationStanding: "verification_only_evidence_review",
+          neutralPreliminaryActionCandidate: "request_explanation",
+          opportunityAuthority: "none_not_established", savingsAuthority: "none_not_established",
+          eligibleSavings: { amountMinor: 0, currency: "USD" },
+          masterSavings: analysis.opportunityEngine.summary.masterSavingsAnnualAmount,
+        },
+        predictedCutover: {
+          verificationOnlyObservedAmount: { changed: false },
+          excludedObservedAmount: { changed: false },
+          totalEligibleAnnualAmount: { changed: false },
+          masterSavingsAnnualAmount: { changed: false },
+          customerStateClassification: { changed: false },
+          permissions: { changed: false },
+          visibleVerification: { changed: false },
+          preliminaryActionTypes: { legacy: ["verify_charge"], predicted: ["request_explanation"], changed: true },
+        },
+      }],
+      statement: {
+        gatedRowCount: 1, gatedComponentCount: 1,
+        predictedCutover: {
+          verificationOnlyObservedAmount: { changed: false },
+          excludedObservedAmount: { changed: false },
+          totalEligibleAnnualAmount: { changed: false },
+          masterSavingsAnnualAmount: { changed: false },
+          customerStateClassification: { changed: false },
+          permissions: { changed: false },
+          visibleVerification: { changed: false },
+        },
+      },
+    });
     expect(JSON.stringify(analysis)).toBe(before);
     expect(analysis).toMatchObject(liveBefore);
 
@@ -145,6 +225,9 @@ describe("F4 shadow migration", () => {
     const shadow = consumeInternalFeeSemantics(analysis).merchantAttentionMarkupShadow;
     expect(shadow.summary.legacyMarkupRows).toBe(0);
     expect(shadow.rows).toEqual([]);
+    expect(consumeInternalFeeSemantics(analysis).packageECustomerStateAuthorityReadBoundary).toMatchObject({
+      status: "available", rows: [], summary: { gatedRows: 0, modeledRows: 0 },
+    });
     expect(JSON.stringify(analysis)).toBe(before);
   });
 
@@ -162,6 +245,10 @@ describe("F4 shadow migration", () => {
           actionability: "not_established", potentialNegotiation: "not_established",
           reasonCodes: ["f4_markup_unknown", "f4_actionability_unknown"] },
         guidanceStatus: "authority_exceeding", neutralFallbackCandidate: { feeMeaning: "unknown" } }],
+    });
+    expect(consumeInternalFeeSemantics(analysis).packageECustomerStateAuthorityReadBoundary).toMatchObject({
+      status: "unavailable", rows: [], statement: null,
+      summary: { gatedRows: 0, modeledRows: 0, positiveOpportunityAuthority: 0, positiveSavingsAuthority: 0 },
     });
     expect(JSON.stringify(analysis)).toBe(before);
   });

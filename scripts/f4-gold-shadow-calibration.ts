@@ -164,6 +164,61 @@ for (const fixture of fixtures) {
   const customerFacingCopyCutover = {
     eligibleRows: attentionShadow.rows.filter(authorityBackedPricingEvidenceCopyEligible).length,
   };
+  const packageERead = internalSemantics.packageECustomerStateAuthorityReadBoundary;
+  if (packageERead.status !== "available"
+    || packageERead.summary.gatedRows !== selectedMarkup.length
+    || packageERead.summary.modeledRows !== selectedMarkup.length
+    || packageERead.summary.unmatchedRows !== 0
+    || packageERead.summary.positiveOpportunityAuthority !== 0
+    || packageERead.summary.positiveSavingsAuthority !== 0
+    || packageERead.summary.eligibleSavingsAmountMinor !== 0
+    || packageERead.rows.some((row) => row.legacyComparison.packageE.kind !== "fee_row_review"
+      || row.legacyComparison.packageE.ownership.economicBeneficiary !== "processor"
+      || row.legacyComparison.packageE.ownership.contractualController !== "processor"
+      || row.legacyComparison.packageE.actionabilityCeiling !== "potentially_actionable"
+      || row.legacyComparison.packageE.eligibility !== "verification_only"
+      || row.legacyComparison.preliminaryActionTypes.join(",") !== "verify_charge"
+      || row.authorityBacked.ownership.collector !== "unknown"
+      || row.authorityBacked.ownership.economicBeneficiary !== "unknown"
+      || row.authorityBacked.ownership.contractualController !== "unknown"
+      || row.authorityBacked.actionability !== "not_established"
+      || row.authorityBacked.opportunityKind !== "fee_row_review"
+      || row.authorityBacked.verificationStanding !== "verification_only_evidence_review"
+      || row.authorityBacked.neutralPreliminaryActionCandidate !== "request_explanation"
+      || row.authorityBacked.opportunityAuthority !== "none_not_established"
+      || row.authorityBacked.savingsAuthority !== "none_not_established"
+      || row.authorityBacked.eligibleSavings.amountMinor !== 0
+      || JSON.stringify(row.authorityBacked.observedAmount) !== JSON.stringify(row.legacyComparison.packageE.observedAmount)
+      || JSON.stringify(row.authorityBacked.evidenceRefs) !== JSON.stringify(row.legacyComparison.packageE.evidenceRefs)
+      || row.predictedCutover.verificationOnlyObservedAmount.changed
+      || row.predictedCutover.excludedObservedAmount.changed
+      || row.predictedCutover.totalEligibleAnnualAmount.changed
+      || row.predictedCutover.masterSavingsAnnualAmount.changed
+      || row.predictedCutover.customerStateClassification.changed
+      || row.predictedCutover.permissions.changed
+      || row.predictedCutover.visibleVerification.changed
+      || row.predictedCutover.preliminaryActionTypes.legacy.join(",") !== "verify_charge"
+      || row.predictedCutover.preliminaryActionTypes.predicted.join(",") !== "request_explanation"))
+    throw new Error(`Package E/customer-state authority read boundary diverged for ${fixture.caseId}`);
+  if (!packageERead.statement
+    || packageERead.statement.predictedCutover.verificationOnlyObservedAmount.changed
+    || packageERead.statement.predictedCutover.excludedObservedAmount.changed
+    || packageERead.statement.predictedCutover.totalEligibleAnnualAmount.changed
+    || packageERead.statement.predictedCutover.masterSavingsAnnualAmount.changed
+    || packageERead.statement.predictedCutover.customerStateClassification.changed
+    || packageERead.statement.predictedCutover.permissions.changed
+    || packageERead.statement.predictedCutover.visibleVerification.changed)
+    throw new Error(`Package E/customer-state predicted statement diagnostics diverged for ${fixture.caseId}`);
+  const packageEAuthorityReadBoundary = {
+    ...packageERead.summary,
+    legacyVerifyCharge: packageERead.rows.filter((row) => row.legacyComparison.preliminaryActionTypes.includes("verify_charge")).length,
+    predictedRequestExplanation: packageERead.rows.filter((row) =>
+      row.predictedCutover.preliminaryActionTypes.predicted.includes("request_explanation")).length,
+    statementVerificationTotalsChanged: packageERead.statement.predictedCutover.verificationOnlyObservedAmount.changed ? 1 : 0,
+    statementCustomerStateChanged: packageERead.statement.predictedCutover.customerStateClassification.changed ? 1 : 0,
+    statementPermissionsChanged: packageERead.statement.predictedCutover.permissions.changed ? 1 : 0,
+    statementVisibilityChanged: packageERead.statement.predictedCutover.visibleVerification.changed ? 1 : 0,
+  };
   const authorityContext = { merchantAttentionMarkupShadow: attentionShadow };
   const cutoverProjection = buildProductionReportProjection(analysis, authorityContext);
   const legacyProjection = buildProductionReportProjection(analysis);
@@ -251,6 +306,7 @@ for (const fixture of fixtures) {
     internalMarkup: internalMarkup.comparison,
     merchantAttentionMarkupShadow: attentionShadow.summary,
     internalMerchantAttentionRetirement: internalRetirement,
+    packageECustomerStateAuthorityReadBoundary: packageEAuthorityReadBoundary,
     customerFacingActionToolkitCopyCutover: customerFacingCopyCutover,
     customerFacingCoherentFindingCutover: coherentFindingCutover,
     completeness: {
@@ -274,6 +330,15 @@ const internalMerchantAttentionRetirementTotals = {
   contractualControllerUnknown: 0, priceControllerUnknown: 0, actionabilityNotEstablished: 0,
 };
 const customerFacingActionToolkitCopyCutoverTotals = { eligibleRows: 0 };
+const packageECustomerStateAuthorityReadBoundaryTotals = {
+  gatedRows: 0, modeledRows: 0, unmatchedRows: 0, ownerUnknown: 0, controllerUnknown: 0,
+  actionabilityNotEstablished: 0, feeRowReviewPreserved: 0, observedAmountPreserved: 0,
+  evidencePreserved: 0, masterSavingsUnchanged: 0, verificationOnlyEvidenceReview: 0,
+  neutralRequestExplanationCandidates: 0,
+  positiveOpportunityAuthority: 0, positiveSavingsAuthority: 0, eligibleSavingsAmountMinor: 0,
+  legacyVerifyCharge: 0, predictedRequestExplanation: 0, statementVerificationTotalsChanged: 0,
+  statementCustomerStateChanged: 0, statementPermissionsChanged: 0, statementVisibilityChanged: 0,
+};
 const customerFacingCoherentFindingCutoverTotals = {
   eligibleRows: 0, independentlyMaterialRows: 0, belowMaterialityRows: 0,
 };
@@ -288,6 +353,8 @@ for (const item of cases) {
     merchantAttentionMarkupShadowTotals[key] += item.merchantAttentionMarkupShadow[key];
   for (const key of Object.keys(internalMerchantAttentionRetirementTotals) as Array<keyof typeof internalMerchantAttentionRetirementTotals>)
     internalMerchantAttentionRetirementTotals[key] += item.internalMerchantAttentionRetirement[key];
+  for (const key of Object.keys(packageECustomerStateAuthorityReadBoundaryTotals) as Array<keyof typeof packageECustomerStateAuthorityReadBoundaryTotals>)
+    packageECustomerStateAuthorityReadBoundaryTotals[key] += item.packageECustomerStateAuthorityReadBoundary[key];
   customerFacingActionToolkitCopyCutoverTotals.eligibleRows += item.customerFacingActionToolkitCopyCutover.eligibleRows;
   for (const key of Object.keys(customerFacingCoherentFindingCutoverTotals) as Array<keyof typeof customerFacingCoherentFindingCutoverTotals>)
     customerFacingCoherentFindingCutoverTotals[key] += item.customerFacingCoherentFindingCutover[key];
@@ -307,6 +374,19 @@ if (Object.values(internalMerchantAttentionRetirementTotals).some((count) => cou
   throw new Error("F4 provisional calibration internal merchant-attention retirement count changed");
 if (customerFacingActionToolkitCopyCutoverTotals.eligibleRows !== 24)
   throw new Error("F4 provisional calibration customer-facing copy gate count changed");
+for (const key of ["gatedRows", "modeledRows", "ownerUnknown", "controllerUnknown",
+  "actionabilityNotEstablished", "feeRowReviewPreserved", "observedAmountPreserved", "evidencePreserved", "masterSavingsUnchanged",
+  "verificationOnlyEvidenceReview", "neutralRequestExplanationCandidates", "legacyVerifyCharge",
+  "predictedRequestExplanation"] as const) {
+  if (packageECustomerStateAuthorityReadBoundaryTotals[key] !== 24)
+    throw new Error(`F4 provisional Package E/customer-state authority count changed: ${key}`);
+}
+for (const key of ["unmatchedRows", "positiveOpportunityAuthority", "positiveSavingsAuthority",
+  "eligibleSavingsAmountMinor", "statementVerificationTotalsChanged", "statementCustomerStateChanged",
+  "statementPermissionsChanged", "statementVisibilityChanged"] as const) {
+  if (packageECustomerStateAuthorityReadBoundaryTotals[key] !== 0)
+    throw new Error(`F4 provisional Package E/customer-state nonzero boundary changed: ${key}`);
+}
 if (customerFacingCoherentFindingCutoverTotals.eligibleRows !== 24
   || customerFacingCoherentFindingCutoverTotals.independentlyMaterialRows !== 5
   || customerFacingCoherentFindingCutoverTotals.belowMaterialityRows !== 19)
@@ -323,6 +403,7 @@ const result = {
     { caseId: "G9", reason: "original_gold_source_unavailable" },
   ],
   totals, internalMarkupTotals, merchantAttentionMarkupShadowTotals, internalMerchantAttentionRetirementTotals,
+  packageECustomerStateAuthorityReadBoundaryTotals,
   customerFacingActionToolkitCopyCutoverTotals, customerFacingCoherentFindingCutoverTotals, cases,
 };
 process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);

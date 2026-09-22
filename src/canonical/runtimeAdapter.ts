@@ -45,6 +45,7 @@ import {
   type InternalProcessorMarkupSemantics,
 } from "../claimAuthorityF4/observedFeeComponentConsumer.js";
 import type { MerchantAttentionMarkupShadowComparison } from "../claimAuthorityF4/merchantAttentionShadowComparison.js";
+import type { PackageECustomerStateAuthorityReadBoundary } from "../claimAuthorityF4/packageECustomerStateAuthorityReadBoundary.js";
 
 export type CanonicalRuntimeInputAdmissionStatus =
   | "canonical_evidence"
@@ -177,6 +178,8 @@ export type CanonicalRuntimeAdapterResult = {
   internalProcessorMarkupSemantics: InternalProcessorMarkupSemantics;
   /** Diagnostic comparison only; it cannot modify Merchant Attention or its projections. */
   internalMerchantAttentionMarkupShadow: MerchantAttentionMarkupShadowComparison;
+  /** Authority-backed Package E/customer-state read boundary; canonical packages remain unchanged. */
+  internalPackageECustomerStateAuthorityReadBoundary: PackageECustomerStateAuthorityReadBoundary;
   aiAdmissionAudit: CanonicalAiAdmissionAudit;
   inputAdmission: CanonicalRuntimeInputAdmission[];
   runtimeAiCapabilitySnapshots: RuntimeAiCapabilitySnapshot[];
@@ -232,6 +235,7 @@ export function buildCanonicalRuntimeAnalysis(input: CanonicalRuntimeAdapterInpu
     internalObservedFeeComponents: internalFeeSemantics.observedFeeComponents,
     internalProcessorMarkupSemantics: internalFeeSemantics.processorMarkup,
     internalMerchantAttentionMarkupShadow: internalFeeSemantics.merchantAttentionMarkupShadow,
+    internalPackageECustomerStateAuthorityReadBoundary: internalFeeSemantics.packageECustomerStateAuthorityReadBoundary,
     aiAdmissionAudit: buildCanonicalAiAdmissionAudit({
       capabilities: finalAnalysis.aiCapabilities.capabilities,
       attempts: runtimeAi.snapshots,
@@ -316,6 +320,7 @@ export async function buildCanonicalRuntimeAnalysisWithRuntimeAi(input: Canonica
     internalObservedFeeComponents: internalFeeSemantics.observedFeeComponents,
     internalProcessorMarkupSemantics: internalFeeSemantics.processorMarkup,
     internalMerchantAttentionMarkupShadow: internalFeeSemantics.merchantAttentionMarkupShadow,
+    internalPackageECustomerStateAuthorityReadBoundary: internalFeeSemantics.packageECustomerStateAuthorityReadBoundary,
     aiAdmissionAudit: buildCanonicalAiAdmissionAudit({
       capabilities: finalAnalysis.aiCapabilities.capabilities,
       attempts: snapshots,
