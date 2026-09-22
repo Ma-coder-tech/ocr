@@ -49,6 +49,10 @@ import {
   applyPackageECustomerStateAuthorityCutover,
   type PackageECustomerStateAuthorityReadBoundary,
 } from "../claimAuthorityF4/packageECustomerStateAuthorityReadBoundary.js";
+import {
+  buildSupportedFiservSavingsAuthorityComparison,
+  type SupportedFiservSavingsAuthorityComparison,
+} from "../claimAuthorityF4/savingsAuthorityComparison.js";
 
 export type CanonicalRuntimeInputAdmissionStatus =
   | "canonical_evidence"
@@ -183,6 +187,8 @@ export type CanonicalRuntimeAdapterResult = {
   internalMerchantAttentionMarkupShadow: MerchantAttentionMarkupShadowComparison;
   /** Authority-backed Package E/customer-state gate plus legacy comparison diagnostics. */
   internalPackageECustomerStateAuthorityReadBoundary: PackageECustomerStateAuthorityReadBoundary;
+  /** Diagnostic-only comparison of legacy savings streams against Claim & Authority. */
+  internalSupportedFiservSavingsAuthorityComparison: SupportedFiservSavingsAuthorityComparison;
   aiAdmissionAudit: CanonicalAiAdmissionAudit;
   inputAdmission: CanonicalRuntimeInputAdmission[];
   runtimeAiCapabilitySnapshots: RuntimeAiCapabilitySnapshot[];
@@ -237,12 +243,18 @@ export function buildCanonicalRuntimeAnalysis(input: CanonicalRuntimeAdapterInpu
     finalAnalysis,
     internalFeeSemantics.packageECustomerStateAuthorityReadBoundary,
   );
+  const savingsAuthorityComparison = buildSupportedFiservSavingsAuthorityComparison({
+    analysis: liveAnalysis,
+    legacySummary,
+    packageEAuthorityReadBoundary: internalFeeSemantics.packageECustomerStateAuthorityReadBoundary,
+  });
   return {
     analysis: liveAnalysis,
     internalObservedFeeComponents: internalFeeSemantics.observedFeeComponents,
     internalProcessorMarkupSemantics: internalFeeSemantics.processorMarkup,
     internalMerchantAttentionMarkupShadow: internalFeeSemantics.merchantAttentionMarkupShadow,
     internalPackageECustomerStateAuthorityReadBoundary: internalFeeSemantics.packageECustomerStateAuthorityReadBoundary,
+    internalSupportedFiservSavingsAuthorityComparison: savingsAuthorityComparison,
     aiAdmissionAudit: buildCanonicalAiAdmissionAudit({
       capabilities: finalAnalysis.aiCapabilities.capabilities,
       attempts: runtimeAi.snapshots,
@@ -326,12 +338,18 @@ export async function buildCanonicalRuntimeAnalysisWithRuntimeAi(input: Canonica
     finalAnalysis,
     internalFeeSemantics.packageECustomerStateAuthorityReadBoundary,
   );
+  const savingsAuthorityComparison = buildSupportedFiservSavingsAuthorityComparison({
+    analysis: liveAnalysis,
+    legacySummary,
+    packageEAuthorityReadBoundary: internalFeeSemantics.packageECustomerStateAuthorityReadBoundary,
+  });
   return {
     analysis: liveAnalysis,
     internalObservedFeeComponents: internalFeeSemantics.observedFeeComponents,
     internalProcessorMarkupSemantics: internalFeeSemantics.processorMarkup,
     internalMerchantAttentionMarkupShadow: internalFeeSemantics.merchantAttentionMarkupShadow,
     internalPackageECustomerStateAuthorityReadBoundary: internalFeeSemantics.packageECustomerStateAuthorityReadBoundary,
+    internalSupportedFiservSavingsAuthorityComparison: savingsAuthorityComparison,
     aiAdmissionAudit: buildCanonicalAiAdmissionAudit({
       capabilities: finalAnalysis.aiCapabilities.capabilities,
       attempts: snapshots,
