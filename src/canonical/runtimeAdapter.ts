@@ -45,7 +45,10 @@ import {
   type InternalProcessorMarkupSemantics,
 } from "../claimAuthorityF4/observedFeeComponentConsumer.js";
 import type { MerchantAttentionMarkupShadowComparison } from "../claimAuthorityF4/merchantAttentionShadowComparison.js";
-import type { PackageECustomerStateAuthorityReadBoundary } from "../claimAuthorityF4/packageECustomerStateAuthorityReadBoundary.js";
+import {
+  applyPackageECustomerStateAuthorityCutover,
+  type PackageECustomerStateAuthorityReadBoundary,
+} from "../claimAuthorityF4/packageECustomerStateAuthorityReadBoundary.js";
 
 export type CanonicalRuntimeInputAdmissionStatus =
   | "canonical_evidence"
@@ -178,7 +181,7 @@ export type CanonicalRuntimeAdapterResult = {
   internalProcessorMarkupSemantics: InternalProcessorMarkupSemantics;
   /** Diagnostic comparison only; it cannot modify Merchant Attention or its projections. */
   internalMerchantAttentionMarkupShadow: MerchantAttentionMarkupShadowComparison;
-  /** Authority-backed Package E/customer-state read boundary; canonical packages remain unchanged. */
+  /** Authority-backed Package E/customer-state gate plus legacy comparison diagnostics. */
   internalPackageECustomerStateAuthorityReadBoundary: PackageECustomerStateAuthorityReadBoundary;
   aiAdmissionAudit: CanonicalAiAdmissionAudit;
   inputAdmission: CanonicalRuntimeInputAdmission[];
@@ -230,8 +233,12 @@ export function buildCanonicalRuntimeAnalysis(input: CanonicalRuntimeAdapterInpu
     : rebuildCustomerProjectionLayers(analysis, aiCapabilities);
 
   const internalFeeSemantics = consumeInternalFeeSemantics(finalAnalysis);
+  const liveAnalysis = applyAuthorityBackedPackageECutover(
+    finalAnalysis,
+    internalFeeSemantics.packageECustomerStateAuthorityReadBoundary,
+  );
   return {
-    analysis: finalAnalysis,
+    analysis: liveAnalysis,
     internalObservedFeeComponents: internalFeeSemantics.observedFeeComponents,
     internalProcessorMarkupSemantics: internalFeeSemantics.processorMarkup,
     internalMerchantAttentionMarkupShadow: internalFeeSemantics.merchantAttentionMarkupShadow,
@@ -315,8 +322,12 @@ export async function buildCanonicalRuntimeAnalysisWithRuntimeAi(input: Canonica
   });
 
   const internalFeeSemantics = consumeInternalFeeSemantics(finalAnalysis);
+  const liveAnalysis = applyAuthorityBackedPackageECutover(
+    finalAnalysis,
+    internalFeeSemantics.packageECustomerStateAuthorityReadBoundary,
+  );
   return {
-    analysis: finalAnalysis,
+    analysis: liveAnalysis,
     internalObservedFeeComponents: internalFeeSemantics.observedFeeComponents,
     internalProcessorMarkupSemantics: internalFeeSemantics.processorMarkup,
     internalMerchantAttentionMarkupShadow: internalFeeSemantics.merchantAttentionMarkupShadow,
@@ -335,6 +346,21 @@ export async function buildCanonicalRuntimeAnalysisWithRuntimeAi(input: Canonica
       reasonCodes: [...merchantLanguageRuntime.reasonCodes],
     },
   };
+}
+
+function applyAuthorityBackedPackageECutover(
+  analysis: CanonicalStatementAnalysis,
+  authorityReadBoundary: PackageECustomerStateAuthorityReadBoundary,
+): CanonicalStatementAnalysis {
+  try {
+    return validateCanonicalStatementAnalysis(applyPackageECustomerStateAuthorityCutover({
+      analysis,
+      authorityReadBoundary,
+    }));
+  } catch {
+    // Missing, inconsistent, or invalid authority context cannot block canonical analysis.
+    return analysis;
+  }
 }
 
 function runtimeBusinessProfile(

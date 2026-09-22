@@ -4,8 +4,11 @@ import { fileURLToPath } from "node:url";
 import { parsePdf, type ParsedDocument } from "../src/parser.js";
 import type { BusinessTypeId } from "../src/businessTypes.js";
 import { buildCanonicalStatementFactsFromParsedDocument } from "../src/canonical/buildCanonicalFacts.js";
+import { buildCanonicalCustomerActionGuidance } from "../src/canonical/customerActionGuidance.js";
+import { validateCanonicalStatementAnalysis } from "../src/canonical/validate.js";
 import { evaluateF4Shadow, type F4LegacyComparison, type F4ShadowDecision } from "../src/claimAuthorityF4/shadow.js";
 import { consumeInternalFeeSemantics } from "../src/claimAuthorityF4/observedFeeComponentConsumer.js";
+import { applyPackageECustomerStateAuthorityCutover } from "../src/claimAuthorityF4/packageECustomerStateAuthorityReadBoundary.js";
 import {
   authorityBackedPricingEvidenceCopyEligible,
   buildProductionReportProjection,
@@ -219,6 +222,74 @@ for (const fixture of fixtures) {
     statementPermissionsChanged: packageERead.statement.predictedCutover.permissions.changed ? 1 : 0,
     statementVisibilityChanged: packageERead.statement.predictedCutover.visibleVerification.changed ? 1 : 0,
   };
+  const liveAnalysis = validateCanonicalStatementAnalysis(applyPackageECustomerStateAuthorityCutover({
+    analysis,
+    authorityReadBoundary: packageERead,
+  }));
+  const gatedComponentIds = new Set(packageERead.rows.map((row) => row.opportunityComponentId));
+  const liveComponents = liveAnalysis.opportunityEngine.components.filter((component) => gatedComponentIds.has(component.id));
+  const livePreliminaryActions = buildCanonicalCustomerActionGuidance({
+    opportunityEngine: liveAnalysis.opportunityEngine,
+    classifications: liveAnalysis.feeOwnershipActionability.rowClassifications,
+  }).filter((action) => action.verificationComponentRefs.some((id) => gatedComponentIds.has(id)));
+  const liveFinalActions = liveAnalysis.customerState.actionGuidance
+    .filter((action) => action.verificationComponentRefs.some((id) => gatedComponentIds.has(id)));
+  const packageELiveCutover = {
+    gatedRows: packageERead.rows.length,
+    cutoverRows: liveComponents.filter((component) =>
+      component.ownership.collector === "unknown"
+      && component.ownership.economicBeneficiary === "unknown"
+      && component.ownership.contractualController === "unknown"
+      && component.actionabilityCeiling === "unknown"
+      && component.kind === "fee_row_review"
+      && component.eligibility === "verification_only"
+      && component.inclusionStatus === "excluded"
+      && component.exclusionReasonCodes.join(",") === "authority_gated_unresolved_evidence_review").length,
+    observedAmountPreserved: liveComponents.filter((component) => {
+      const legacy = analysis.opportunityEngine.components.find((item) => item.id === component.id);
+      return JSON.stringify(component.observedAmount) === JSON.stringify(legacy?.observedAmount);
+    }).length,
+    evidencePreserved: liveComponents.filter((component) => {
+      const legacy = analysis.opportunityEngine.components.find((item) => item.id === component.id);
+      return JSON.stringify(component.evidenceRefs) === JSON.stringify(legacy?.evidenceRefs);
+    }).length,
+    noTargetOrCalculation: liveComponents.filter((component) => component.target.type === "none"
+      && component.calculation.calculationRef === null && component.calculation.result === null).length,
+    preliminaryRequestExplanation: livePreliminaryActions.filter((action) => action.actionType === "request_explanation"
+      && action.opportunityComponentRefs.length === 0).length,
+    visibleFinalRequestExplanation: liveFinalActions.filter((action) => action.actionType === "request_explanation"
+      && action.opportunityComponentRefs.length === 0).length,
+    verificationTotalChanged: Number(JSON.stringify(liveAnalysis.opportunityEngine.summary.verificationOnlyObservedAmount)
+      !== JSON.stringify(analysis.opportunityEngine.summary.verificationOnlyObservedAmount)),
+    excludedTotalChanged: Number(JSON.stringify(liveAnalysis.opportunityEngine.summary.excludedObservedAmount)
+      !== JSON.stringify(analysis.opportunityEngine.summary.excludedObservedAmount)),
+    eligibleTotalChanged: Number(JSON.stringify(liveAnalysis.opportunityEngine.summary.totalEligibleAnnualAmount)
+      !== JSON.stringify(analysis.opportunityEngine.summary.totalEligibleAnnualAmount)),
+    masterSavingsChanged: Number(JSON.stringify(liveAnalysis.opportunityEngine.summary.masterSavingsAnnualAmount)
+      !== JSON.stringify(analysis.opportunityEngine.summary.masterSavingsAnnualAmount)),
+    customerStateClassificationChanged: Number(JSON.stringify({
+      primaryState: liveAnalysis.customerState.primaryState, axes: liveAnalysis.customerState.axes,
+    }) !== JSON.stringify({ primaryState: analysis.customerState.primaryState, axes: analysis.customerState.axes })),
+    permissionsChanged: Number(JSON.stringify(liveAnalysis.customerState.permissions) !== JSON.stringify(analysis.customerState.permissions)),
+    visibilityChanged: Number(JSON.stringify(liveAnalysis.customerState.visibility) !== JSON.stringify(analysis.customerState.visibility)),
+    packageDChanged: Number(JSON.stringify(liveAnalysis.feeOwnershipActionability) !== JSON.stringify(analysis.feeOwnershipActionability)),
+    canonicalFinancialsChanged: Number(JSON.stringify(liveAnalysis.financialFacts) !== JSON.stringify(analysis.financialFacts)
+      || JSON.stringify(liveAnalysis.feeLedger) !== JSON.stringify(analysis.feeLedger)),
+    merchantAttentionChanged: Number(JSON.stringify(liveAnalysis.merchantAttention) !== JSON.stringify(analysis.merchantAttention)),
+    positiveOpportunityLinks: livePreliminaryActions.filter((action) => action.opportunityComponentRefs.length > 0).length,
+    positiveEligibleSavingsAmountMinor: liveComponents
+      .filter((component) => component.inclusionStatus === "included")
+      .reduce((sum, component) => sum + (component.calculation.result?.amountMinor ?? 0), 0),
+  };
+  if (packageELiveCutover.cutoverRows !== packageELiveCutover.gatedRows
+    || packageELiveCutover.observedAmountPreserved !== packageELiveCutover.gatedRows
+    || packageELiveCutover.evidencePreserved !== packageELiveCutover.gatedRows
+    || packageELiveCutover.noTargetOrCalculation !== packageELiveCutover.gatedRows
+    || packageELiveCutover.preliminaryRequestExplanation !== packageELiveCutover.gatedRows
+    || Object.entries(packageELiveCutover).some(([key, value]) =>
+      !["gatedRows", "cutoverRows", "observedAmountPreserved", "evidencePreserved", "noTargetOrCalculation",
+        "preliminaryRequestExplanation", "visibleFinalRequestExplanation"].includes(key) && value !== 0))
+    throw new Error(`Package E/customer-state live cutover diverged for ${fixture.caseId}`);
   const authorityContext = { merchantAttentionMarkupShadow: attentionShadow };
   const cutoverProjection = buildProductionReportProjection(analysis, authorityContext);
   const legacyProjection = buildProductionReportProjection(analysis);
@@ -307,6 +378,7 @@ for (const fixture of fixtures) {
     merchantAttentionMarkupShadow: attentionShadow.summary,
     internalMerchantAttentionRetirement: internalRetirement,
     packageECustomerStateAuthorityReadBoundary: packageEAuthorityReadBoundary,
+    packageECustomerStateLiveCutover: packageELiveCutover,
     customerFacingActionToolkitCopyCutover: customerFacingCopyCutover,
     customerFacingCoherentFindingCutover: coherentFindingCutover,
     completeness: {
@@ -342,6 +414,14 @@ const packageECustomerStateAuthorityReadBoundaryTotals = {
 const customerFacingCoherentFindingCutoverTotals = {
   eligibleRows: 0, independentlyMaterialRows: 0, belowMaterialityRows: 0,
 };
+const packageECustomerStateLiveCutoverTotals = {
+  gatedRows: 0, cutoverRows: 0, observedAmountPreserved: 0, evidencePreserved: 0,
+  noTargetOrCalculation: 0, preliminaryRequestExplanation: 0, visibleFinalRequestExplanation: 0,
+  verificationTotalChanged: 0, excludedTotalChanged: 0, eligibleTotalChanged: 0, masterSavingsChanged: 0,
+  customerStateClassificationChanged: 0, permissionsChanged: 0, visibilityChanged: 0, packageDChanged: 0,
+  canonicalFinancialsChanged: 0, merchantAttentionChanged: 0, positiveOpportunityLinks: 0,
+  positiveEligibleSavingsAmountMinor: 0,
+};
 for (const item of cases) {
   for (const basis of ["exact", "proxy"] as const) {
     for (const [relation, count] of Object.entries(item.comparisons[basis]))
@@ -355,6 +435,8 @@ for (const item of cases) {
     internalMerchantAttentionRetirementTotals[key] += item.internalMerchantAttentionRetirement[key];
   for (const key of Object.keys(packageECustomerStateAuthorityReadBoundaryTotals) as Array<keyof typeof packageECustomerStateAuthorityReadBoundaryTotals>)
     packageECustomerStateAuthorityReadBoundaryTotals[key] += item.packageECustomerStateAuthorityReadBoundary[key];
+  for (const key of Object.keys(packageECustomerStateLiveCutoverTotals) as Array<keyof typeof packageECustomerStateLiveCutoverTotals>)
+    packageECustomerStateLiveCutoverTotals[key] += item.packageECustomerStateLiveCutover[key];
   customerFacingActionToolkitCopyCutoverTotals.eligibleRows += item.customerFacingActionToolkitCopyCutover.eligibleRows;
   for (const key of Object.keys(customerFacingCoherentFindingCutoverTotals) as Array<keyof typeof customerFacingCoherentFindingCutoverTotals>)
     customerFacingCoherentFindingCutoverTotals[key] += item.customerFacingCoherentFindingCutover[key];
@@ -391,6 +473,18 @@ if (customerFacingCoherentFindingCutoverTotals.eligibleRows !== 24
   || customerFacingCoherentFindingCutoverTotals.independentlyMaterialRows !== 5
   || customerFacingCoherentFindingCutoverTotals.belowMaterialityRows !== 19)
   throw new Error("F4 provisional calibration coherent finding cutover count changed");
+for (const key of ["gatedRows", "cutoverRows", "observedAmountPreserved", "evidencePreserved",
+  "noTargetOrCalculation", "preliminaryRequestExplanation"] as const) {
+  if (packageECustomerStateLiveCutoverTotals[key] !== 24)
+    throw new Error(`F4 provisional Package E/customer-state live cutover count changed: ${key}`);
+}
+for (const key of ["verificationTotalChanged", "excludedTotalChanged", "eligibleTotalChanged", "masterSavingsChanged",
+  "customerStateClassificationChanged", "permissionsChanged", "visibilityChanged", "packageDChanged",
+  "canonicalFinancialsChanged", "merchantAttentionChanged", "positiveOpportunityLinks",
+  "positiveEligibleSavingsAmountMinor"] as const) {
+  if (packageECustomerStateLiveCutoverTotals[key] !== 0)
+    throw new Error(`F4 provisional Package E/customer-state live invariant changed: ${key}`);
+}
 
 const result = {
   schemaVersion: "f4_gold_shadow_calibration_v1",
@@ -404,6 +498,7 @@ const result = {
   ],
   totals, internalMarkupTotals, merchantAttentionMarkupShadowTotals, internalMerchantAttentionRetirementTotals,
   packageECustomerStateAuthorityReadBoundaryTotals,
+  packageECustomerStateLiveCutoverTotals,
   customerFacingActionToolkitCopyCutoverTotals, customerFacingCoherentFindingCutoverTotals, cases,
 };
 process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);

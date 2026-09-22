@@ -136,6 +136,8 @@ export type PackageECustomerStateAuthorityReadBoundary = {
   };
 };
 
+type AuthorityReadRow = PackageECustomerStateAuthorityReadBoundary["rows"][number];
+
 type Projection = {
   engine: CanonicalOpportunityEngine;
   customerState: CanonicalCustomerStateProjection;
@@ -290,6 +292,38 @@ export function buildPackageECustomerStateAuthorityReadBoundary(input: {
   };
 }
 
+/**
+ * Applies the Product-approved Package E/customer-state cutover only to rows that
+ * still satisfy the exact authority and evidence gate represented by this read
+ * boundary. The general unknown-owner eligibility policy remains unchanged.
+ */
+export function applyPackageECustomerStateAuthorityCutover(input: {
+  analysis: CanonicalStatementAnalysis;
+  authorityReadBoundary: PackageECustomerStateAuthorityReadBoundary;
+}): CanonicalStatementAnalysis {
+  const { analysis, authorityReadBoundary } = input;
+  if (authorityReadBoundary.status !== "available" || authorityReadBoundary.rows.length === 0) return analysis;
+
+  const componentIds = new Set<string>();
+  for (const row of authorityReadBoundary.rows) {
+    const components = feeRowReviewComponents(analysis.opportunityEngine, row.feeRowId);
+    if (components.length !== 1) continue;
+    const component = components[0]!;
+    const classification = analysis.feeOwnershipActionability.rowClassifications.find((item) =>
+      item.feeRowId === row.feeRowId && item.selected.candidateId === row.legacyCandidateId);
+    if (!classification || !livePackageECutoverEligible(row, component, classification.selected.category)) continue;
+    componentIds.add(component.id);
+  }
+  if (componentIds.size === 0) return analysis;
+
+  const projected = predictedProjection(analysis, componentIds);
+  return {
+    ...analysis,
+    opportunityEngine: projected.engine,
+    customerState: projected.customerState,
+  };
+}
+
 function emptySummary(): PackageECustomerStateAuthorityReadBoundary["summary"] {
   return {
     gatedRows: 0,
@@ -348,8 +382,13 @@ function predictedProjection(analysis: CanonicalStatementAnalysis, componentIds:
     if (!componentIds.has(component.id)) continue;
     component.ownership = { collector: "unknown", economicBeneficiary: "unknown", contractualController: "unknown" };
     component.actionabilityCeiling = "unknown";
-    // Product explicitly preserves verification-only as an evidence-review state. Do not
-    // run defaultEligibility here: its unknown-owner branch is the later cutover decision.
+    component.kind = "fee_row_review";
+    component.eligibility = "verification_only";
+    component.inclusionStatus = "excluded";
+    component.inclusionReasonCodes = [];
+    component.exclusionReasonCodes = ["authority_gated_unresolved_evidence_review"];
+    // Product explicitly preserves verification-only as an evidence-review state.
+    // Do not run defaultEligibility: the general unknown-owner rule remains unchanged.
   }
   engine.summary = aggregateCanonicalOpportunityComponents(engine.components);
   const preliminaryActions = buildCanonicalCustomerActionGuidance({
@@ -366,6 +405,39 @@ function predictedProjection(analysis: CanonicalStatementAnalysis, componentIds:
     rateComparison: analysis.customerState.rateComparison,
   });
   return { engine, customerState, preliminaryActions };
+}
+
+function livePackageECutoverEligible(
+  row: AuthorityReadRow,
+  component: CanonicalOpportunityComponent,
+  selectedCategory: string,
+): boolean {
+  return selectedCategory === "processor_markup"
+    && row.gate.legacyPackageDCategory === "processor_markup"
+    && row.gate.observedFeeComponent === "supported"
+    && row.gate.potentialNegotiation === "not_established"
+    && row.authorityBacked.ownership.collector === "unknown"
+    && row.authorityBacked.ownership.economicBeneficiary === "unknown"
+    && row.authorityBacked.ownership.contractualController === "unknown"
+    && row.authorityBacked.actionability === "not_established"
+    && row.authorityBacked.verificationStanding === "verification_only_evidence_review"
+    && row.authorityBacked.neutralPreliminaryActionCandidate === "request_explanation"
+    && row.authorityBacked.opportunityAuthority === "none_not_established"
+    && row.authorityBacked.savingsAuthority === "none_not_established"
+    && row.authorityBacked.eligibleSavings.amountMinor === 0
+    && component.id === row.opportunityComponentId
+    && component.kind === "fee_row_review"
+    && component.eligibility === "verification_only"
+    && component.inclusionStatus === "excluded"
+    && component.observedAmount !== null
+    && component.observedAmount.amount.amountMinor > 0
+    && component.evidenceRefs.length > 0
+    && equal(component.observedAmount, row.legacyComparison.packageE.observedAmount)
+    && equal(component.evidenceRefs, row.legacyComparison.packageE.evidenceRefs)
+    && component.target.type === "none"
+    && component.calculation.calculationRef === null
+    && component.calculation.formulaCode === "none_not_eligible"
+    && component.calculation.result === null;
 }
 
 function diagnostics(

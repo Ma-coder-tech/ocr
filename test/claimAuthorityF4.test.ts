@@ -6,6 +6,8 @@ import { buildCanonicalFeeOwnershipActionability } from "../src/canonical/feeOwn
 import { buildCanonicalFeeLedger } from "../src/canonical/feeLedger.js";
 import { buildCanonicalMerchantAttentionModel } from "../src/canonical/merchantAttention.js";
 import { buildCanonicalOpportunityEngine } from "../src/canonical/opportunityEngine.js";
+import { defaultEligibility } from "../src/canonical/opportunityPolicy.js";
+import { buildCanonicalCustomerActionGuidance } from "../src/canonical/customerActionGuidance.js";
 import { buildCanonicalCustomerState } from "../src/canonical/customerStateResolver.js";
 import type { CanonicalStatementAnalysis } from "../src/canonical/types.js";
 import { buildF4DecisionGraph, evaluateF4Shadow, tryEvaluateF4Shadow } from "../src/claimAuthorityF4/shadow.js";
@@ -15,6 +17,7 @@ import {
   processorMarkupStatusFromF4,
 } from "../src/claimAuthorityF4/observedFeeComponentConsumer.js";
 import { compareMerchantAttentionMarkupShadow } from "../src/claimAuthorityF4/merchantAttentionShadowComparison.js";
+import { applyPackageECustomerStateAuthorityCutover } from "../src/claimAuthorityF4/packageECustomerStateAuthorityReadBoundary.js";
 import { createF3PublicSnapshot } from "../src/claimAuthorityF3/snapshot.js";
 import type { F3PublicSnapshot } from "../src/claimAuthorityF3/types.js";
 import type { ParsedDocument } from "../src/parser.js";
@@ -215,6 +218,100 @@ describe("F4 shadow migration", () => {
     expect(independent.summary.legacyMarkupRows).toBe(1);
     expect(independent.rows[0]!.currentAttention?.itemId).toBe(shadow.rows[0]!.currentAttention?.itemId);
     expect(JSON.stringify(statementItem)).toBe(statementItemBefore);
+  });
+
+  it("applies the narrow unknown-owner evidence-review cutover without creating opportunity or savings", () => {
+    const analysis = fixture();
+    analysis.merchantAttention = buildCanonicalMerchantAttentionModel(analysis);
+    const internal = consumeInternalFeeSemantics(analysis);
+    const boundary = internal.packageECustomerStateAuthorityReadBoundary;
+    const row = analysis.feeLedger.rows[0]!;
+    const legacyComponent = analysis.opportunityEngine.components.find((component) =>
+      component.kind === "fee_row_review" && component.feeRowRefs.some((ref) => ref.feeRowId === row.id));
+    if (!legacyComponent) throw new Error("Missing legacy fee-row review component");
+    const legacyPreliminary = buildCanonicalCustomerActionGuidance({
+      opportunityEngine: analysis.opportunityEngine,
+      classifications: analysis.feeOwnershipActionability.rowClassifications,
+    });
+    const protectedBefore = {
+      financialFacts: structuredClone(analysis.financialFacts),
+      feeLedger: structuredClone(analysis.feeLedger),
+      packageD: structuredClone(analysis.feeOwnershipActionability),
+      merchantAttention: structuredClone(analysis.merchantAttention),
+      verificationOnlyObservedAmount: structuredClone(analysis.opportunityEngine.summary.verificationOnlyObservedAmount),
+      excludedObservedAmount: structuredClone(analysis.opportunityEngine.summary.excludedObservedAmount),
+      totalEligibleAnnualAmount: structuredClone(analysis.opportunityEngine.summary.totalEligibleAnnualAmount),
+      masterSavingsAnnualAmount: structuredClone(analysis.opportunityEngine.summary.masterSavingsAnnualAmount),
+      permissions: structuredClone(analysis.customerState.permissions),
+      visibility: structuredClone(analysis.customerState.visibility),
+      axes: structuredClone(analysis.customerState.axes),
+      primaryState: analysis.customerState.primaryState,
+    };
+
+    const live = applyPackageECustomerStateAuthorityCutover({ analysis, authorityReadBoundary: boundary });
+    const component = live.opportunityEngine.components.find((item) => item.id === legacyComponent.id);
+    if (!component) throw new Error("Missing cut-over fee-row review component");
+    const preliminary = buildCanonicalCustomerActionGuidance({
+      opportunityEngine: live.opportunityEngine,
+      classifications: live.feeOwnershipActionability.rowClassifications,
+    }).filter((action) => action.verificationComponentRefs.includes(component.id));
+    const finalActions = live.customerState.actionGuidance
+      .filter((action) => action.verificationComponentRefs.includes(component.id));
+
+    expect(legacyPreliminary.filter((action) => action.verificationComponentRefs.includes(component.id))
+      .map((action) => action.actionType)).toEqual(["verify_charge"]);
+    expect(component).toMatchObject({
+      kind: "fee_row_review",
+      eligibility: "verification_only",
+      inclusionStatus: "excluded",
+      ownership: { collector: "unknown", economicBeneficiary: "unknown", contractualController: "unknown" },
+      actionabilityCeiling: "unknown",
+      target: { type: "none" },
+      calculation: { calculationRef: null, formulaCode: "none_not_eligible", result: null },
+      inclusionReasonCodes: [],
+      exclusionReasonCodes: ["authority_gated_unresolved_evidence_review"],
+    });
+    expect(component.observedAmount).toEqual(legacyComponent.observedAmount);
+    expect(component.evidenceRefs).toEqual(legacyComponent.evidenceRefs);
+    expect(preliminary).toMatchObject([{
+      actionType: "request_explanation",
+      opportunityComponentRefs: [],
+      verificationComponentRefs: [component.id],
+    }]);
+    expect(finalActions.map((action) => action.actionType)).toEqual(
+      analysis.customerState.actionGuidance.some((action) => action.verificationComponentRefs.includes(component.id))
+        ? ["request_explanation"] : [],
+    );
+    expect(live.financialFacts).toEqual(protectedBefore.financialFacts);
+    expect(live.feeLedger).toEqual(protectedBefore.feeLedger);
+    expect(live.feeOwnershipActionability).toEqual(protectedBefore.packageD);
+    expect(live.merchantAttention).toEqual(protectedBefore.merchantAttention);
+    expect(live.opportunityEngine.summary).toMatchObject({
+      verificationOnlyObservedAmount: protectedBefore.verificationOnlyObservedAmount,
+      excludedObservedAmount: protectedBefore.excludedObservedAmount,
+      totalEligibleAnnualAmount: protectedBefore.totalEligibleAnnualAmount,
+      masterSavingsAnnualAmount: protectedBefore.masterSavingsAnnualAmount,
+    });
+    expect(live.customerState).toMatchObject({
+      permissions: protectedBefore.permissions,
+      visibility: protectedBefore.visibility,
+      axes: protectedBefore.axes,
+      primaryState: protectedBefore.primaryState,
+    });
+    expect(live.opportunityEngine.summary.totalEligibleAnnualAmount.amountMinor).toBe(0);
+    expect(live.opportunityEngine.summary.masterSavingsAnnualAmount.amountMinor).toBe(0);
+
+    // The global policy is deliberately unchanged; only the authority gate overrides it.
+    expect(defaultEligibility({
+      ownership: { collector: "network", economicBeneficiary: "network", contractualController: "network" },
+      actionabilityCeiling: "potentially_actionable",
+      hasObservedAmount: true,
+    })).toEqual({ eligibility: "excluded", reasonCodes: ["protected_or_unknown_owner"] });
+    expect(defaultEligibility({
+      ownership: { collector: "unknown", economicBeneficiary: "unknown", contractualController: "unknown" },
+      actionabilityCeiling: "unknown",
+      hasObservedAmount: true,
+    })).toEqual({ eligibility: "excluded", reasonCodes: ["protected_or_unknown_owner"] });
   });
 
   it("leaves non-markup Merchant Attention outside the shadow comparison", () => {
