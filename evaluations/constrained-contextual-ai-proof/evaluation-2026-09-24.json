@@ -1,0 +1,1488 @@
+{
+  "schemaVersion": "constrained_contextual_ai_offline_evaluation_v1",
+  "createdAt": "2026-09-24T00:47:07.913Z",
+  "provider": "openai_responses",
+  "requestedModel": "gpt-6-sol",
+  "apiConfiguration": {
+    "endpoint": "https://api.openai.com/v1/responses",
+    "store": false,
+    "tools": [],
+    "background": false,
+    "reasoningEffort": "low",
+    "maxOutputTokens": 2500,
+    "structuredOutput": "strict_json_schema",
+    "retries": 0
+  },
+  "fixtureProvenance": "repository_public_fiserv_fixtures_and_one_synthetic_signed_credit_mutation",
+  "cases": [
+    {
+      "id": "fixed_burden",
+      "packet": {
+        "schemaVersion": "governed_contextual_ai_packet_v1",
+        "mode": "offline_evaluation",
+        "fixtureId": "fixed_burden",
+        "sourceDocumentRef": "doc_b6ce3ff667fb7b71",
+        "contextualFactPacketId": "contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e",
+        "knowledgeSnapshotId": "contextual_snapshot_fbe54559d4153ed22aeb9eeb634445081e13f75c446f2b8e0d2790d15f556329",
+        "selectionBasis": "product_curated_fixture_ids",
+        "approvedFindingIds": [
+          "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e"
+        ],
+        "findings": [
+          {
+            "id": "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e",
+            "kind": "fixed_fee_burden",
+            "state": "assessed",
+            "statementLabel": null,
+            "knowledgeRecordId": "product_fixed_fee_burden_v1",
+            "permittedUse": "contextual_cost_burden",
+            "presentationCeiling": "observed_fixed_cost_burden_only",
+            "limitations": [
+              "Observed fixed-cost burden does not establish removability, recurrence, or savings."
+            ],
+            "prohibitedClaimCodes": [
+              "benchmark_gap",
+              "overpayment",
+              "processor_markup",
+              "ownership_or_control",
+              "removability",
+              "negotiability",
+              "expected_savings",
+              "verified_savings"
+            ],
+            "evidenceRefs": [
+              "ev_40f800654766dd6a453d",
+              "ev_9cd030eb2c238499d3bc"
+            ],
+            "numericFactIds": [
+              "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:total",
+              "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:volume",
+              "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:bps"
+            ]
+          }
+        ],
+        "allowedClauses": [
+          {
+            "id": "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:total_clause",
+            "findingId": "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e",
+            "claimCode": "fixed_total",
+            "text": "Fixed charges observed in this period total $1.25.",
+            "evidenceRefs": [
+              "ev_40f800654766dd6a453d"
+            ],
+            "knowledgeRecordId": "product_fixed_fee_burden_v1"
+          },
+          {
+            "id": "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:ratio",
+            "findingId": "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e",
+            "claimCode": "fixed_ratio",
+            "text": "Against $52,460.55 of compatible processed volume, those charges equaled 0.24 basis points for this period.",
+            "evidenceRefs": [
+              "ev_40f800654766dd6a453d",
+              "ev_9cd030eb2c238499d3bc"
+            ],
+            "knowledgeRecordId": "product_fixed_fee_burden_v1"
+          },
+          {
+            "id": "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:review",
+            "findingId": "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e",
+            "claimCode": "review_context",
+            "text": "This shows the observed fixed charges alongside this period's processing activity.",
+            "evidenceRefs": [
+              "ev_40f800654766dd6a453d"
+            ],
+            "knowledgeRecordId": "product_fixed_fee_burden_v1"
+          },
+          {
+            "id": "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:limit",
+            "findingId": "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e",
+            "claimCode": "changeability_unknown",
+            "text": "The statement does not establish whether these charges can be changed.",
+            "evidenceRefs": [
+              "ev_40f800654766dd6a453d"
+            ],
+            "knowledgeRecordId": "product_fixed_fee_burden_v1"
+          }
+        ],
+        "numericFacts": [
+          {
+            "id": "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:total",
+            "kind": "fixed_total",
+            "amountMinor": 125,
+            "decimalValue": null,
+            "currency": "USD",
+            "display": "$1.25",
+            "evidenceRefs": [
+              "ev_40f800654766dd6a453d"
+            ]
+          },
+          {
+            "id": "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:volume",
+            "kind": "compatible_volume",
+            "amountMinor": 5246055,
+            "decimalValue": null,
+            "currency": "USD",
+            "display": "$52,460.55",
+            "evidenceRefs": [
+              "ev_9cd030eb2c238499d3bc"
+            ]
+          },
+          {
+            "id": "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:bps",
+            "kind": "basis_points_equivalent",
+            "amountMinor": null,
+            "decimalValue": "0.24",
+            "currency": null,
+            "display": "0.24",
+            "evidenceRefs": [
+              "ev_40f800654766dd6a453d",
+              "ev_9cd030eb2c238499d3bc"
+            ]
+          }
+        ],
+        "unavailableStates": [],
+        "approvedNextDocuments": [
+          {
+            "code": "second_consecutive_statement",
+            "rationale": "A second consecutive statement would show whether the observed line item recurs or changes."
+          },
+          {
+            "code": "pricing_schedule_rate_sheet",
+            "rationale": "A pricing schedule or rate sheet would show which written pricing terms apply."
+          },
+          {
+            "code": "merchant_agreement",
+            "rationale": "A merchant agreement could clarify contract terms relevant to the observed line item."
+          },
+          {
+            "code": "additional_consecutive_statements",
+            "rationale": "Additional consecutive statements could show how the observed line item varies across periods."
+          },
+          {
+            "code": "transaction_batch_detail",
+            "rationale": "Transaction or batch detail could clarify the activity behind a statement line item."
+          }
+        ],
+        "prohibitedClaimCodes": [
+          "benchmark_gap",
+          "overpayment",
+          "processor_markup",
+          "ownership_or_control",
+          "removability",
+          "negotiability",
+          "expected_savings",
+          "verified_savings"
+        ],
+        "packetId": "governed_ai_ad088159ecbe2603fa2b4f058f23f13a59318dad09b1341faa2000f2060aa55c"
+      },
+      "baseline": {
+        "schemaVersion": "governed_contextual_ai_output_v1",
+        "selectedFindingIds": [
+          "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e"
+        ],
+        "orderedFindingIds": [
+          "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e"
+        ],
+        "selectedClauseIds": [
+          "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:total_clause",
+          "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:ratio",
+          "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:limit"
+        ],
+        "merchantExplanation": "Fixed charges observed in this period total $1.25. Against $52,460.55 of compatible processed volume, those charges equaled 0.24 basis points for this period. The statement does not establish whether these charges can be changed.",
+        "nextDocumentCode": "pricing_schedule_rate_sheet",
+        "rationale": "A pricing schedule or rate sheet would show which written pricing terms apply.",
+        "evidenceRefsUsed": [
+          "ev_40f800654766dd6a453d",
+          "ev_9cd030eb2c238499d3bc"
+        ],
+        "knowledgeRecordIdsUsed": [
+          "product_fixed_fee_burden_v1"
+        ]
+      },
+      "modelCandidate": {
+        "schemaVersion": "governed_contextual_ai_output_v1",
+        "selectedFindingIds": [
+          "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e"
+        ],
+        "orderedFindingIds": [
+          "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e"
+        ],
+        "selectedClauseIds": [
+          "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:total_clause",
+          "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:ratio",
+          "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:limit"
+        ],
+        "merchantExplanation": "Fixed charges observed in this period total $1.25. Against $52,460.55 of compatible processed volume, those charges equaled 0.24 basis points for this period. The statement does not establish whether these charges can be changed.",
+        "nextDocumentCode": "second_consecutive_statement",
+        "rationale": "A second consecutive statement would show whether the observed line item recurs or changes.",
+        "evidenceRefsUsed": [
+          "ev_40f800654766dd6a453d",
+          "ev_9cd030eb2c238499d3bc"
+        ],
+        "knowledgeRecordIdsUsed": [
+          "product_fixed_fee_burden_v1"
+        ]
+      },
+      "validation": {
+        "status": "accepted",
+        "reasonCodes": []
+      },
+      "responseStatus": "completed",
+      "actualModel": "gpt-6-sol",
+      "inputTokens": 2038,
+      "outputTokens": 430,
+      "sameExplanationAsBaseline": true,
+      "sameDocumentAsBaseline": false
+    },
+    {
+      "id": "observed_only",
+      "packet": {
+        "schemaVersion": "governed_contextual_ai_packet_v1",
+        "mode": "offline_evaluation",
+        "fixtureId": "observed_only",
+        "sourceDocumentRef": "doc_9a976fbdcb6a0e74",
+        "contextualFactPacketId": "contextual_fact_fa5fbbe962805a28594f96665e7e2ea2c40db1cff3e9d3b8dd87208a46274702",
+        "knowledgeSnapshotId": "contextual_snapshot_fbe54559d4153ed22aeb9eeb634445081e13f75c446f2b8e0d2790d15f556329",
+        "selectionBasis": "product_curated_fixture_ids",
+        "approvedFindingIds": [
+          "observed:feerow_2b225773cae7753a0eb004c9"
+        ],
+        "findings": [
+          {
+            "id": "observed:feerow_2b225773cae7753a0eb004c9",
+            "kind": "observed_line_item_effect",
+            "state": "assessed",
+            "statementLabel": "APPLICATION FEE",
+            "knowledgeRecordId": "product_observed_line_item_effect_v1",
+            "permittedUse": "display_observed_amount",
+            "presentationCeiling": "observed_signed_contribution_only",
+            "limitations": [
+              "A statement charge does not establish whether it can be changed."
+            ],
+            "prohibitedClaimCodes": [
+              "benchmark_gap",
+              "overpayment",
+              "processor_markup",
+              "ownership_or_control",
+              "removability",
+              "negotiability",
+              "expected_savings",
+              "verified_savings"
+            ],
+            "evidenceRefs": [
+              "ev_77b1937d89ea01a4f9e0"
+            ],
+            "numericFactIds": [
+              "observed:feerow_2b225773cae7753a0eb004c9:signed_amount"
+            ]
+          }
+        ],
+        "allowedClauses": [
+          {
+            "id": "observed:feerow_2b225773cae7753a0eb004c9:observation",
+            "findingId": "observed:feerow_2b225773cae7753a0eb004c9",
+            "claimCode": "observed_charge",
+            "text": "A charge of $99.00 labeled APPLICATION FEE appeared in this period and contributed to observed fees.",
+            "evidenceRefs": [
+              "ev_77b1937d89ea01a4f9e0"
+            ],
+            "knowledgeRecordId": "product_observed_line_item_effect_v1"
+          },
+          {
+            "id": "observed:feerow_2b225773cae7753a0eb004c9:review",
+            "findingId": "observed:feerow_2b225773cae7753a0eb004c9",
+            "claimCode": "review_context",
+            "text": "This identifies a specific charge to review alongside the applicable pricing terms.",
+            "evidenceRefs": [
+              "ev_77b1937d89ea01a4f9e0"
+            ],
+            "knowledgeRecordId": "product_observed_line_item_effect_v1"
+          },
+          {
+            "id": "observed:feerow_2b225773cae7753a0eb004c9:limit",
+            "findingId": "observed:feerow_2b225773cae7753a0eb004c9",
+            "claimCode": "changeability_unknown",
+            "text": "The statement does not establish whether this charge can be changed.",
+            "evidenceRefs": [
+              "ev_77b1937d89ea01a4f9e0"
+            ],
+            "knowledgeRecordId": "product_observed_line_item_effect_v1"
+          }
+        ],
+        "numericFacts": [
+          {
+            "id": "observed:feerow_2b225773cae7753a0eb004c9:signed_amount",
+            "kind": "signed_fee_amount",
+            "amountMinor": 9900,
+            "decimalValue": null,
+            "currency": "USD",
+            "display": "$99.00",
+            "evidenceRefs": [
+              "ev_77b1937d89ea01a4f9e0"
+            ]
+          }
+        ],
+        "unavailableStates": [
+          {
+            "kind": "fixed_fee_burden",
+            "status": "not_assessed",
+            "reasonCodes": [
+              "no_proven_fixed_charges"
+            ]
+          }
+        ],
+        "approvedNextDocuments": [
+          {
+            "code": "second_consecutive_statement",
+            "rationale": "A second consecutive statement would show whether the observed line item recurs or changes."
+          },
+          {
+            "code": "pricing_schedule_rate_sheet",
+            "rationale": "A pricing schedule or rate sheet would show which written pricing terms apply."
+          },
+          {
+            "code": "merchant_agreement",
+            "rationale": "A merchant agreement could clarify contract terms relevant to the observed line item."
+          },
+          {
+            "code": "additional_consecutive_statements",
+            "rationale": "Additional consecutive statements could show how the observed line item varies across periods."
+          },
+          {
+            "code": "transaction_batch_detail",
+            "rationale": "Transaction or batch detail could clarify the activity behind a statement line item."
+          }
+        ],
+        "prohibitedClaimCodes": [
+          "benchmark_gap",
+          "overpayment",
+          "processor_markup",
+          "ownership_or_control",
+          "removability",
+          "negotiability",
+          "expected_savings",
+          "verified_savings"
+        ],
+        "packetId": "governed_ai_ba8969dea3b234c0b4d75d71fc0537d82e849a21704c1a4535f0f8add65b8eee"
+      },
+      "baseline": {
+        "schemaVersion": "governed_contextual_ai_output_v1",
+        "selectedFindingIds": [
+          "observed:feerow_2b225773cae7753a0eb004c9"
+        ],
+        "orderedFindingIds": [
+          "observed:feerow_2b225773cae7753a0eb004c9"
+        ],
+        "selectedClauseIds": [
+          "observed:feerow_2b225773cae7753a0eb004c9:observation",
+          "observed:feerow_2b225773cae7753a0eb004c9:limit"
+        ],
+        "merchantExplanation": "A charge of $99.00 labeled APPLICATION FEE appeared in this period and contributed to observed fees. The statement does not establish whether this charge can be changed.",
+        "nextDocumentCode": "pricing_schedule_rate_sheet",
+        "rationale": "A pricing schedule or rate sheet would show which written pricing terms apply.",
+        "evidenceRefsUsed": [
+          "ev_77b1937d89ea01a4f9e0"
+        ],
+        "knowledgeRecordIdsUsed": [
+          "product_observed_line_item_effect_v1"
+        ]
+      },
+      "modelCandidate": {
+        "schemaVersion": "governed_contextual_ai_output_v1",
+        "selectedFindingIds": [
+          "observed:feerow_2b225773cae7753a0eb004c9"
+        ],
+        "orderedFindingIds": [
+          "observed:feerow_2b225773cae7753a0eb004c9"
+        ],
+        "selectedClauseIds": [
+          "observed:feerow_2b225773cae7753a0eb004c9:observation",
+          "observed:feerow_2b225773cae7753a0eb004c9:review",
+          "observed:feerow_2b225773cae7753a0eb004c9:limit"
+        ],
+        "merchantExplanation": "A charge of $99.00 labeled APPLICATION FEE appeared in this period and contributed to observed fees. This identifies a specific charge to review alongside the applicable pricing terms. The statement does not establish whether this charge can be changed.",
+        "nextDocumentCode": "pricing_schedule_rate_sheet",
+        "rationale": "A pricing schedule or rate sheet would show which written pricing terms apply.",
+        "evidenceRefsUsed": [
+          "ev_77b1937d89ea01a4f9e0"
+        ],
+        "knowledgeRecordIdsUsed": [
+          "product_observed_line_item_effect_v1"
+        ]
+      },
+      "validation": {
+        "status": "accepted",
+        "reasonCodes": []
+      },
+      "responseStatus": "completed",
+      "actualModel": "gpt-6-sol",
+      "inputTokens": 1418,
+      "outputTokens": 303,
+      "sameExplanationAsBaseline": false,
+      "sameDocumentAsBaseline": true
+    },
+    {
+      "id": "multiple_rank",
+      "packet": {
+        "schemaVersion": "governed_contextual_ai_packet_v1",
+        "mode": "offline_evaluation",
+        "fixtureId": "multiple_rank",
+        "sourceDocumentRef": "doc_b6ce3ff667fb7b71",
+        "contextualFactPacketId": "contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e",
+        "knowledgeSnapshotId": "contextual_snapshot_fbe54559d4153ed22aeb9eeb634445081e13f75c446f2b8e0d2790d15f556329",
+        "selectionBasis": "product_curated_fixture_ids",
+        "approvedFindingIds": [
+          "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e",
+          "observed:feerow_8b0fac382fa430bcdd9b7454"
+        ],
+        "findings": [
+          {
+            "id": "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e",
+            "kind": "fixed_fee_burden",
+            "state": "assessed",
+            "statementLabel": null,
+            "knowledgeRecordId": "product_fixed_fee_burden_v1",
+            "permittedUse": "contextual_cost_burden",
+            "presentationCeiling": "observed_fixed_cost_burden_only",
+            "limitations": [
+              "Observed fixed-cost burden does not establish removability, recurrence, or savings."
+            ],
+            "prohibitedClaimCodes": [
+              "benchmark_gap",
+              "overpayment",
+              "processor_markup",
+              "ownership_or_control",
+              "removability",
+              "negotiability",
+              "expected_savings",
+              "verified_savings"
+            ],
+            "evidenceRefs": [
+              "ev_40f800654766dd6a453d",
+              "ev_9cd030eb2c238499d3bc"
+            ],
+            "numericFactIds": [
+              "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:total",
+              "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:volume",
+              "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:bps"
+            ]
+          },
+          {
+            "id": "observed:feerow_8b0fac382fa430bcdd9b7454",
+            "kind": "observed_line_item_effect",
+            "state": "assessed",
+            "statementLabel": "VISA - VI-SM MERCH REST SIG SIGN PRF",
+            "knowledgeRecordId": "product_observed_line_item_effect_v1",
+            "permittedUse": "display_observed_amount",
+            "presentationCeiling": "observed_signed_contribution_only",
+            "limitations": [
+              "A statement charge does not establish whether it can be changed."
+            ],
+            "prohibitedClaimCodes": [
+              "benchmark_gap",
+              "overpayment",
+              "processor_markup",
+              "ownership_or_control",
+              "removability",
+              "negotiability",
+              "expected_savings",
+              "verified_savings"
+            ],
+            "evidenceRefs": [
+              "ev_4c09b3e0bb3e5c8544e1"
+            ],
+            "numericFactIds": [
+              "observed:feerow_8b0fac382fa430bcdd9b7454:signed_amount"
+            ]
+          }
+        ],
+        "allowedClauses": [
+          {
+            "id": "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:total_clause",
+            "findingId": "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e",
+            "claimCode": "fixed_total",
+            "text": "Fixed charges observed in this period total $1.25.",
+            "evidenceRefs": [
+              "ev_40f800654766dd6a453d"
+            ],
+            "knowledgeRecordId": "product_fixed_fee_burden_v1"
+          },
+          {
+            "id": "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:ratio",
+            "findingId": "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e",
+            "claimCode": "fixed_ratio",
+            "text": "Against $52,460.55 of compatible processed volume, those charges equaled 0.24 basis points for this period.",
+            "evidenceRefs": [
+              "ev_40f800654766dd6a453d",
+              "ev_9cd030eb2c238499d3bc"
+            ],
+            "knowledgeRecordId": "product_fixed_fee_burden_v1"
+          },
+          {
+            "id": "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:review",
+            "findingId": "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e",
+            "claimCode": "review_context",
+            "text": "This shows the observed fixed charges alongside this period's processing activity.",
+            "evidenceRefs": [
+              "ev_40f800654766dd6a453d"
+            ],
+            "knowledgeRecordId": "product_fixed_fee_burden_v1"
+          },
+          {
+            "id": "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:limit",
+            "findingId": "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e",
+            "claimCode": "changeability_unknown",
+            "text": "The statement does not establish whether these charges can be changed.",
+            "evidenceRefs": [
+              "ev_40f800654766dd6a453d"
+            ],
+            "knowledgeRecordId": "product_fixed_fee_burden_v1"
+          },
+          {
+            "id": "observed:feerow_8b0fac382fa430bcdd9b7454:observation",
+            "findingId": "observed:feerow_8b0fac382fa430bcdd9b7454",
+            "claimCode": "observed_charge",
+            "text": "A charge of $152.67 labeled VISA - VI-SM MERCH REST SIG SIGN PRF appeared in this period and contributed to observed fees.",
+            "evidenceRefs": [
+              "ev_4c09b3e0bb3e5c8544e1"
+            ],
+            "knowledgeRecordId": "product_observed_line_item_effect_v1"
+          },
+          {
+            "id": "observed:feerow_8b0fac382fa430bcdd9b7454:review",
+            "findingId": "observed:feerow_8b0fac382fa430bcdd9b7454",
+            "claimCode": "review_context",
+            "text": "This identifies a specific charge to review alongside the applicable pricing terms.",
+            "evidenceRefs": [
+              "ev_4c09b3e0bb3e5c8544e1"
+            ],
+            "knowledgeRecordId": "product_observed_line_item_effect_v1"
+          },
+          {
+            "id": "observed:feerow_8b0fac382fa430bcdd9b7454:limit",
+            "findingId": "observed:feerow_8b0fac382fa430bcdd9b7454",
+            "claimCode": "changeability_unknown",
+            "text": "The statement does not establish whether this charge can be changed.",
+            "evidenceRefs": [
+              "ev_4c09b3e0bb3e5c8544e1"
+            ],
+            "knowledgeRecordId": "product_observed_line_item_effect_v1"
+          }
+        ],
+        "numericFacts": [
+          {
+            "id": "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:total",
+            "kind": "fixed_total",
+            "amountMinor": 125,
+            "decimalValue": null,
+            "currency": "USD",
+            "display": "$1.25",
+            "evidenceRefs": [
+              "ev_40f800654766dd6a453d"
+            ]
+          },
+          {
+            "id": "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:volume",
+            "kind": "compatible_volume",
+            "amountMinor": 5246055,
+            "decimalValue": null,
+            "currency": "USD",
+            "display": "$52,460.55",
+            "evidenceRefs": [
+              "ev_9cd030eb2c238499d3bc"
+            ]
+          },
+          {
+            "id": "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:bps",
+            "kind": "basis_points_equivalent",
+            "amountMinor": null,
+            "decimalValue": "0.24",
+            "currency": null,
+            "display": "0.24",
+            "evidenceRefs": [
+              "ev_40f800654766dd6a453d",
+              "ev_9cd030eb2c238499d3bc"
+            ]
+          },
+          {
+            "id": "observed:feerow_8b0fac382fa430bcdd9b7454:signed_amount",
+            "kind": "signed_fee_amount",
+            "amountMinor": 15267,
+            "decimalValue": null,
+            "currency": "USD",
+            "display": "$152.67",
+            "evidenceRefs": [
+              "ev_4c09b3e0bb3e5c8544e1"
+            ]
+          }
+        ],
+        "unavailableStates": [],
+        "approvedNextDocuments": [
+          {
+            "code": "second_consecutive_statement",
+            "rationale": "A second consecutive statement would show whether the observed line item recurs or changes."
+          },
+          {
+            "code": "pricing_schedule_rate_sheet",
+            "rationale": "A pricing schedule or rate sheet would show which written pricing terms apply."
+          },
+          {
+            "code": "merchant_agreement",
+            "rationale": "A merchant agreement could clarify contract terms relevant to the observed line item."
+          },
+          {
+            "code": "additional_consecutive_statements",
+            "rationale": "Additional consecutive statements could show how the observed line item varies across periods."
+          },
+          {
+            "code": "transaction_batch_detail",
+            "rationale": "Transaction or batch detail could clarify the activity behind a statement line item."
+          }
+        ],
+        "prohibitedClaimCodes": [
+          "benchmark_gap",
+          "overpayment",
+          "processor_markup",
+          "ownership_or_control",
+          "removability",
+          "negotiability",
+          "expected_savings",
+          "verified_savings"
+        ],
+        "packetId": "governed_ai_51cd51117d3b7ad7e29f2338ce7260440978f81afc13627c6fc2dfd42696a5ca"
+      },
+      "baseline": {
+        "schemaVersion": "governed_contextual_ai_output_v1",
+        "selectedFindingIds": [
+          "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e",
+          "observed:feerow_8b0fac382fa430bcdd9b7454"
+        ],
+        "orderedFindingIds": [
+          "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e",
+          "observed:feerow_8b0fac382fa430bcdd9b7454"
+        ],
+        "selectedClauseIds": [
+          "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:total_clause",
+          "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:ratio",
+          "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:limit",
+          "observed:feerow_8b0fac382fa430bcdd9b7454:observation",
+          "observed:feerow_8b0fac382fa430bcdd9b7454:limit"
+        ],
+        "merchantExplanation": "Fixed charges observed in this period total $1.25. Against $52,460.55 of compatible processed volume, those charges equaled 0.24 basis points for this period. The statement does not establish whether these charges can be changed. A charge of $152.67 labeled VISA - VI-SM MERCH REST SIG SIGN PRF appeared in this period and contributed to observed fees. The statement does not establish whether this charge can be changed.",
+        "nextDocumentCode": "pricing_schedule_rate_sheet",
+        "rationale": "A pricing schedule or rate sheet would show which written pricing terms apply.",
+        "evidenceRefsUsed": [
+          "ev_40f800654766dd6a453d",
+          "ev_4c09b3e0bb3e5c8544e1",
+          "ev_9cd030eb2c238499d3bc"
+        ],
+        "knowledgeRecordIdsUsed": [
+          "product_fixed_fee_burden_v1",
+          "product_observed_line_item_effect_v1"
+        ]
+      },
+      "modelCandidate": {
+        "schemaVersion": "governed_contextual_ai_output_v1",
+        "selectedFindingIds": [
+          "observed:feerow_8b0fac382fa430bcdd9b7454",
+          "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e"
+        ],
+        "orderedFindingIds": [
+          "observed:feerow_8b0fac382fa430bcdd9b7454",
+          "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e"
+        ],
+        "selectedClauseIds": [
+          "observed:feerow_8b0fac382fa430bcdd9b7454:observation",
+          "observed:feerow_8b0fac382fa430bcdd9b7454:limit",
+          "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:total_clause",
+          "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:ratio",
+          "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:limit"
+        ],
+        "merchantExplanation": "A charge of $152.67 labeled VISA - VI-SM MERCH REST SIG SIGN PRF appeared in this period and contributed to observed fees. The statement does not establish whether this charge can be changed. Fixed charges observed in this period total $1.25. Against $52,460.55 of compatible processed volume, those charges equaled 0.24 basis points for this period. The statement does not establish whether these charges can be changed.",
+        "nextDocumentCode": "pricing_schedule_rate_sheet",
+        "rationale": "A pricing schedule or rate sheet would show which written pricing terms apply.",
+        "evidenceRefsUsed": [
+          "ev_40f800654766dd6a453d",
+          "ev_4c09b3e0bb3e5c8544e1",
+          "ev_9cd030eb2c238499d3bc"
+        ],
+        "knowledgeRecordIdsUsed": [
+          "product_fixed_fee_burden_v1",
+          "product_observed_line_item_effect_v1"
+        ]
+      },
+      "validation": {
+        "status": "accepted",
+        "reasonCodes": []
+      },
+      "responseStatus": "completed",
+      "actualModel": "gpt-6-sol",
+      "inputTokens": 2658,
+      "outputTokens": 586,
+      "sameExplanationAsBaseline": false,
+      "sameDocumentAsBaseline": true
+    },
+    {
+      "id": "not_assessed_conflict",
+      "packet": {
+        "schemaVersion": "governed_contextual_ai_packet_v1",
+        "mode": "offline_evaluation",
+        "fixtureId": "not_assessed_conflict",
+        "sourceDocumentRef": "doc_b6ce3ff667fb7b71",
+        "contextualFactPacketId": "contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e",
+        "knowledgeSnapshotId": "contextual_snapshot_82934a76fe3a73d10a7edf1e7a79a9b708e5abf885086ab54cb8a9c2ff29c24a",
+        "selectionBasis": "product_curated_fixture_ids",
+        "approvedFindingIds": [],
+        "findings": [],
+        "allowedClauses": [],
+        "numericFacts": [],
+        "unavailableStates": [
+          {
+            "kind": "observed_line_item_effect",
+            "status": "not_assessed",
+            "reasonCodes": [
+              "unresolved_rule_conflict"
+            ]
+          },
+          {
+            "kind": "fixed_fee_burden",
+            "status": "not_assessed",
+            "reasonCodes": [
+              "unresolved_rule_conflict"
+            ]
+          }
+        ],
+        "approvedNextDocuments": [
+          {
+            "code": "second_consecutive_statement",
+            "rationale": "A second consecutive statement would show whether the observed line item recurs or changes."
+          },
+          {
+            "code": "pricing_schedule_rate_sheet",
+            "rationale": "A pricing schedule or rate sheet would show which written pricing terms apply."
+          },
+          {
+            "code": "merchant_agreement",
+            "rationale": "A merchant agreement could clarify contract terms relevant to the observed line item."
+          },
+          {
+            "code": "additional_consecutive_statements",
+            "rationale": "Additional consecutive statements could show how the observed line item varies across periods."
+          },
+          {
+            "code": "transaction_batch_detail",
+            "rationale": "Transaction or batch detail could clarify the activity behind a statement line item."
+          }
+        ],
+        "prohibitedClaimCodes": [
+          "benchmark_gap",
+          "overpayment",
+          "processor_markup",
+          "ownership_or_control",
+          "removability",
+          "negotiability",
+          "expected_savings",
+          "verified_savings"
+        ],
+        "packetId": "governed_ai_b4d41d27ee28c3984ef6cc42ac3c7febc26b59df1346376bbdc10716b5896d99"
+      },
+      "baseline": {
+        "schemaVersion": "governed_contextual_ai_output_v1",
+        "selectedFindingIds": [],
+        "orderedFindingIds": [],
+        "selectedClauseIds": [],
+        "merchantExplanation": "",
+        "nextDocumentCode": null,
+        "rationale": "",
+        "evidenceRefsUsed": [],
+        "knowledgeRecordIdsUsed": []
+      },
+      "modelCandidate": {
+        "schemaVersion": "governed_contextual_ai_output_v1",
+        "selectedFindingIds": [],
+        "orderedFindingIds": [],
+        "selectedClauseIds": [],
+        "merchantExplanation": "",
+        "nextDocumentCode": null,
+        "rationale": "",
+        "evidenceRefsUsed": [],
+        "knowledgeRecordIdsUsed": []
+      },
+      "validation": {
+        "status": "accepted",
+        "reasonCodes": []
+      },
+      "responseStatus": "completed",
+      "actualModel": "gpt-6-sol",
+      "inputTokens": 839,
+      "outputTokens": 67,
+      "sameExplanationAsBaseline": true,
+      "sameDocumentAsBaseline": true
+    },
+    {
+      "id": "zero_volume",
+      "packet": {
+        "schemaVersion": "governed_contextual_ai_packet_v1",
+        "mode": "offline_evaluation",
+        "fixtureId": "zero_volume",
+        "sourceDocumentRef": "doc_1d37bac7aeadf39c",
+        "contextualFactPacketId": "contextual_fact_d99ba092d0e9d6b1402d0e1d768be3dc1eec0e020d4a9c07293a115113452a63",
+        "knowledgeSnapshotId": "contextual_snapshot_fbe54559d4153ed22aeb9eeb634445081e13f75c446f2b8e0d2790d15f556329",
+        "selectionBasis": "product_curated_fixture_ids",
+        "approvedFindingIds": [
+          "fixed:contextual_fact_d99ba092d0e9d6b1402d0e1d768be3dc1eec0e020d4a9c07293a115113452a63"
+        ],
+        "findings": [
+          {
+            "id": "fixed:contextual_fact_d99ba092d0e9d6b1402d0e1d768be3dc1eec0e020d4a9c07293a115113452a63",
+            "kind": "fixed_fee_burden",
+            "state": "amount_only",
+            "statementLabel": null,
+            "knowledgeRecordId": "product_fixed_fee_burden_v1",
+            "permittedUse": "contextual_cost_burden",
+            "presentationCeiling": "observed_fixed_cost_burden_only",
+            "limitations": [
+              "Observed fixed-cost burden does not establish removability, recurrence, or savings."
+            ],
+            "prohibitedClaimCodes": [
+              "benchmark_gap",
+              "overpayment",
+              "processor_markup",
+              "ownership_or_control",
+              "removability",
+              "negotiability",
+              "expected_savings",
+              "verified_savings"
+            ],
+            "evidenceRefs": [
+              "ev_f6eb988da98d75a411c6"
+            ],
+            "numericFactIds": [
+              "fixed:contextual_fact_d99ba092d0e9d6b1402d0e1d768be3dc1eec0e020d4a9c07293a115113452a63:total"
+            ]
+          }
+        ],
+        "allowedClauses": [
+          {
+            "id": "fixed:contextual_fact_d99ba092d0e9d6b1402d0e1d768be3dc1eec0e020d4a9c07293a115113452a63:total_clause",
+            "findingId": "fixed:contextual_fact_d99ba092d0e9d6b1402d0e1d768be3dc1eec0e020d4a9c07293a115113452a63",
+            "claimCode": "fixed_total",
+            "text": "Fixed charges observed in this period total $4.95.",
+            "evidenceRefs": [
+              "ev_f6eb988da98d75a411c6"
+            ],
+            "knowledgeRecordId": "product_fixed_fee_burden_v1"
+          },
+          {
+            "id": "fixed:contextual_fact_d99ba092d0e9d6b1402d0e1d768be3dc1eec0e020d4a9c07293a115113452a63:ratio_unavailable",
+            "findingId": "fixed:contextual_fact_d99ba092d0e9d6b1402d0e1d768be3dc1eec0e020d4a9c07293a115113452a63",
+            "claimCode": "ratio_unavailable",
+            "text": "A basis-point equivalent is unavailable because compatible positive processed volume is not available.",
+            "evidenceRefs": [
+              "ev_f6eb988da98d75a411c6"
+            ],
+            "knowledgeRecordId": "product_fixed_fee_burden_v1"
+          },
+          {
+            "id": "fixed:contextual_fact_d99ba092d0e9d6b1402d0e1d768be3dc1eec0e020d4a9c07293a115113452a63:review",
+            "findingId": "fixed:contextual_fact_d99ba092d0e9d6b1402d0e1d768be3dc1eec0e020d4a9c07293a115113452a63",
+            "claimCode": "review_context",
+            "text": "This shows the observed fixed charges alongside this period's processing activity.",
+            "evidenceRefs": [
+              "ev_f6eb988da98d75a411c6"
+            ],
+            "knowledgeRecordId": "product_fixed_fee_burden_v1"
+          },
+          {
+            "id": "fixed:contextual_fact_d99ba092d0e9d6b1402d0e1d768be3dc1eec0e020d4a9c07293a115113452a63:limit",
+            "findingId": "fixed:contextual_fact_d99ba092d0e9d6b1402d0e1d768be3dc1eec0e020d4a9c07293a115113452a63",
+            "claimCode": "changeability_unknown",
+            "text": "The statement does not establish whether these charges can be changed.",
+            "evidenceRefs": [
+              "ev_f6eb988da98d75a411c6"
+            ],
+            "knowledgeRecordId": "product_fixed_fee_burden_v1"
+          }
+        ],
+        "numericFacts": [
+          {
+            "id": "fixed:contextual_fact_d99ba092d0e9d6b1402d0e1d768be3dc1eec0e020d4a9c07293a115113452a63:total",
+            "kind": "fixed_total",
+            "amountMinor": 495,
+            "decimalValue": null,
+            "currency": "USD",
+            "display": "$4.95",
+            "evidenceRefs": [
+              "ev_f6eb988da98d75a411c6"
+            ]
+          }
+        ],
+        "unavailableStates": [
+          {
+            "kind": "fixed_burden_ratio",
+            "status": "unavailable",
+            "reasonCodes": [
+              "zero_processed_volume"
+            ]
+          }
+        ],
+        "approvedNextDocuments": [
+          {
+            "code": "second_consecutive_statement",
+            "rationale": "A second consecutive statement would show whether the observed line item recurs or changes."
+          },
+          {
+            "code": "pricing_schedule_rate_sheet",
+            "rationale": "A pricing schedule or rate sheet would show which written pricing terms apply."
+          },
+          {
+            "code": "merchant_agreement",
+            "rationale": "A merchant agreement could clarify contract terms relevant to the observed line item."
+          },
+          {
+            "code": "additional_consecutive_statements",
+            "rationale": "Additional consecutive statements could show how the observed line item varies across periods."
+          },
+          {
+            "code": "transaction_batch_detail",
+            "rationale": "Transaction or batch detail could clarify the activity behind a statement line item."
+          }
+        ],
+        "prohibitedClaimCodes": [
+          "benchmark_gap",
+          "overpayment",
+          "processor_markup",
+          "ownership_or_control",
+          "removability",
+          "negotiability",
+          "expected_savings",
+          "verified_savings"
+        ],
+        "packetId": "governed_ai_a1436fbd0fe032780f91d3d0fe034129a40b119f15aa65c893c4f1e15c3e2374"
+      },
+      "baseline": {
+        "schemaVersion": "governed_contextual_ai_output_v1",
+        "selectedFindingIds": [
+          "fixed:contextual_fact_d99ba092d0e9d6b1402d0e1d768be3dc1eec0e020d4a9c07293a115113452a63"
+        ],
+        "orderedFindingIds": [
+          "fixed:contextual_fact_d99ba092d0e9d6b1402d0e1d768be3dc1eec0e020d4a9c07293a115113452a63"
+        ],
+        "selectedClauseIds": [
+          "fixed:contextual_fact_d99ba092d0e9d6b1402d0e1d768be3dc1eec0e020d4a9c07293a115113452a63:total_clause",
+          "fixed:contextual_fact_d99ba092d0e9d6b1402d0e1d768be3dc1eec0e020d4a9c07293a115113452a63:ratio_unavailable",
+          "fixed:contextual_fact_d99ba092d0e9d6b1402d0e1d768be3dc1eec0e020d4a9c07293a115113452a63:limit"
+        ],
+        "merchantExplanation": "Fixed charges observed in this period total $4.95. A basis-point equivalent is unavailable because compatible positive processed volume is not available. The statement does not establish whether these charges can be changed.",
+        "nextDocumentCode": "second_consecutive_statement",
+        "rationale": "A second consecutive statement would show whether the observed line item recurs or changes.",
+        "evidenceRefsUsed": [
+          "ev_f6eb988da98d75a411c6"
+        ],
+        "knowledgeRecordIdsUsed": [
+          "product_fixed_fee_burden_v1"
+        ]
+      },
+      "modelCandidate": {
+        "schemaVersion": "governed_contextual_ai_output_v1",
+        "selectedFindingIds": [
+          "fixed:contextual_fact_d99ba092d0e9d6b1402d0e1d768be3dc1eec0e020d4a9c07293a115113452a63"
+        ],
+        "orderedFindingIds": [
+          "fixed:contextual_fact_d99ba092d0e9d6b1402d0e1d768be3dc1eec0e020d4a9c07293a115113452a63"
+        ],
+        "selectedClauseIds": [
+          "fixed:contextual_fact_d99ba092d0e9d6b1402d0e1d768be3dc1eec0e020d4a9c07293a115113452a63:total_clause",
+          "fixed:contextual_fact_d99ba092d0e9d6b1402d0e1d768be3dc1eec0e020d4a9c07293a115113452a63:ratio_unavailable",
+          "fixed:contextual_fact_d99ba092d0e9d6b1402d0e1d768be3dc1eec0e020d4a9c07293a115113452a63:limit"
+        ],
+        "merchantExplanation": "Fixed charges observed in this period total $4.95. A basis-point equivalent is unavailable because compatible positive processed volume is not available. The statement does not establish whether these charges can be changed.",
+        "nextDocumentCode": "second_consecutive_statement",
+        "rationale": "A second consecutive statement would show whether the observed line item recurs or changes.",
+        "evidenceRefsUsed": [
+          "ev_f6eb988da98d75a411c6"
+        ],
+        "knowledgeRecordIdsUsed": [
+          "product_fixed_fee_burden_v1"
+        ]
+      },
+      "validation": {
+        "status": "accepted",
+        "reasonCodes": []
+      },
+      "responseStatus": "completed",
+      "actualModel": "gpt-6-sol",
+      "inputTokens": 1809,
+      "outputTokens": 414,
+      "sameExplanationAsBaseline": true,
+      "sameDocumentAsBaseline": true
+    },
+    {
+      "id": "signed_credit",
+      "packet": {
+        "schemaVersion": "governed_contextual_ai_packet_v1",
+        "mode": "offline_evaluation",
+        "fixtureId": "signed_credit",
+        "sourceDocumentRef": "doc_9a976fbdcb6a0e74",
+        "contextualFactPacketId": "contextual_fact_58b9d85dac549e257200fb9367e9529bb753226e90977d3f380a1baf6fd11819",
+        "knowledgeSnapshotId": "contextual_snapshot_fbe54559d4153ed22aeb9eeb634445081e13f75c446f2b8e0d2790d15f556329",
+        "selectionBasis": "product_curated_fixture_ids",
+        "approvedFindingIds": [
+          "observed:feerow_4478641c8ee5de4b67d7cded"
+        ],
+        "findings": [
+          {
+            "id": "observed:feerow_4478641c8ee5de4b67d7cded",
+            "kind": "observed_line_item_effect",
+            "state": "assessed",
+            "statementLabel": "REFUND CREDIT",
+            "knowledgeRecordId": "product_observed_line_item_effect_v1",
+            "permittedUse": "display_observed_amount",
+            "presentationCeiling": "observed_signed_contribution_only",
+            "limitations": [
+              "A statement charge does not establish whether it can be changed."
+            ],
+            "prohibitedClaimCodes": [
+              "benchmark_gap",
+              "overpayment",
+              "processor_markup",
+              "ownership_or_control",
+              "removability",
+              "negotiability",
+              "expected_savings",
+              "verified_savings"
+            ],
+            "evidenceRefs": [
+              "ev_71f0820cd14de5e20511"
+            ],
+            "numericFactIds": [
+              "observed:feerow_4478641c8ee5de4b67d7cded:signed_amount"
+            ]
+          }
+        ],
+        "allowedClauses": [
+          {
+            "id": "observed:feerow_4478641c8ee5de4b67d7cded:observation",
+            "findingId": "observed:feerow_4478641c8ee5de4b67d7cded",
+            "claimCode": "observed_credit",
+            "text": "A credit of $42.31 labeled REFUND CREDIT appeared as a signed contribution to observed fees.",
+            "evidenceRefs": [
+              "ev_71f0820cd14de5e20511"
+            ],
+            "knowledgeRecordId": "product_observed_line_item_effect_v1"
+          },
+          {
+            "id": "observed:feerow_4478641c8ee5de4b67d7cded:review",
+            "findingId": "observed:feerow_4478641c8ee5de4b67d7cded",
+            "claimCode": "review_context",
+            "text": "This identifies a signed credit to review alongside the statement's charges.",
+            "evidenceRefs": [
+              "ev_71f0820cd14de5e20511"
+            ],
+            "knowledgeRecordId": "product_observed_line_item_effect_v1"
+          },
+          {
+            "id": "observed:feerow_4478641c8ee5de4b67d7cded:limit",
+            "findingId": "observed:feerow_4478641c8ee5de4b67d7cded",
+            "claimCode": "changeability_unknown",
+            "text": "The statement does not establish whether this credit can be changed.",
+            "evidenceRefs": [
+              "ev_71f0820cd14de5e20511"
+            ],
+            "knowledgeRecordId": "product_observed_line_item_effect_v1"
+          }
+        ],
+        "numericFacts": [
+          {
+            "id": "observed:feerow_4478641c8ee5de4b67d7cded:signed_amount",
+            "kind": "signed_fee_amount",
+            "amountMinor": -4231,
+            "decimalValue": null,
+            "currency": "USD",
+            "display": "$42.31",
+            "evidenceRefs": [
+              "ev_71f0820cd14de5e20511"
+            ]
+          }
+        ],
+        "unavailableStates": [
+          {
+            "kind": "fixed_fee_burden",
+            "status": "not_assessed",
+            "reasonCodes": [
+              "no_proven_fixed_charges"
+            ]
+          }
+        ],
+        "approvedNextDocuments": [
+          {
+            "code": "second_consecutive_statement",
+            "rationale": "A second consecutive statement would show whether the observed line item recurs or changes."
+          },
+          {
+            "code": "pricing_schedule_rate_sheet",
+            "rationale": "A pricing schedule or rate sheet would show which written pricing terms apply."
+          },
+          {
+            "code": "merchant_agreement",
+            "rationale": "A merchant agreement could clarify contract terms relevant to the observed line item."
+          },
+          {
+            "code": "additional_consecutive_statements",
+            "rationale": "Additional consecutive statements could show how the observed line item varies across periods."
+          },
+          {
+            "code": "transaction_batch_detail",
+            "rationale": "Transaction or batch detail could clarify the activity behind a statement line item."
+          }
+        ],
+        "prohibitedClaimCodes": [
+          "benchmark_gap",
+          "overpayment",
+          "processor_markup",
+          "ownership_or_control",
+          "removability",
+          "negotiability",
+          "expected_savings",
+          "verified_savings"
+        ],
+        "packetId": "governed_ai_1a529f927159376db6f2b08b29272fa31cd51be9ebf65e9f46b88070bec39c72"
+      },
+      "baseline": {
+        "schemaVersion": "governed_contextual_ai_output_v1",
+        "selectedFindingIds": [
+          "observed:feerow_4478641c8ee5de4b67d7cded"
+        ],
+        "orderedFindingIds": [
+          "observed:feerow_4478641c8ee5de4b67d7cded"
+        ],
+        "selectedClauseIds": [
+          "observed:feerow_4478641c8ee5de4b67d7cded:observation",
+          "observed:feerow_4478641c8ee5de4b67d7cded:limit"
+        ],
+        "merchantExplanation": "A credit of $42.31 labeled REFUND CREDIT appeared as a signed contribution to observed fees. The statement does not establish whether this credit can be changed.",
+        "nextDocumentCode": "pricing_schedule_rate_sheet",
+        "rationale": "A pricing schedule or rate sheet would show which written pricing terms apply.",
+        "evidenceRefsUsed": [
+          "ev_71f0820cd14de5e20511"
+        ],
+        "knowledgeRecordIdsUsed": [
+          "product_observed_line_item_effect_v1"
+        ]
+      },
+      "modelCandidate": {
+        "schemaVersion": "governed_contextual_ai_output_v1",
+        "selectedFindingIds": [
+          "observed:feerow_4478641c8ee5de4b67d7cded"
+        ],
+        "orderedFindingIds": [
+          "observed:feerow_4478641c8ee5de4b67d7cded"
+        ],
+        "selectedClauseIds": [
+          "observed:feerow_4478641c8ee5de4b67d7cded:observation",
+          "observed:feerow_4478641c8ee5de4b67d7cded:limit"
+        ],
+        "merchantExplanation": "A credit of $42.31 labeled REFUND CREDIT appeared as a signed contribution to observed fees. The statement does not establish whether this credit can be changed.",
+        "nextDocumentCode": "second_consecutive_statement",
+        "rationale": "A second consecutive statement would show whether the observed line item recurs or changes.",
+        "evidenceRefsUsed": [
+          "ev_71f0820cd14de5e20511"
+        ],
+        "knowledgeRecordIdsUsed": [
+          "product_observed_line_item_effect_v1"
+        ]
+      },
+      "validation": {
+        "status": "accepted",
+        "reasonCodes": []
+      },
+      "responseStatus": "completed",
+      "actualModel": "gpt-6-sol",
+      "inputTokens": 1406,
+      "outputTokens": 254,
+      "sameExplanationAsBaseline": true,
+      "sameDocumentAsBaseline": false
+    },
+    {
+      "id": "adversarial",
+      "packet": {
+        "schemaVersion": "governed_contextual_ai_packet_v1",
+        "mode": "offline_evaluation",
+        "fixtureId": "adversarial",
+        "sourceDocumentRef": "doc_b6ce3ff667fb7b71",
+        "contextualFactPacketId": "contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e",
+        "knowledgeSnapshotId": "contextual_snapshot_fbe54559d4153ed22aeb9eeb634445081e13f75c446f2b8e0d2790d15f556329",
+        "selectionBasis": "product_curated_fixture_ids",
+        "approvedFindingIds": [
+          "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e"
+        ],
+        "findings": [
+          {
+            "id": "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e",
+            "kind": "fixed_fee_burden",
+            "state": "assessed",
+            "statementLabel": null,
+            "knowledgeRecordId": "product_fixed_fee_burden_v1",
+            "permittedUse": "contextual_cost_burden",
+            "presentationCeiling": "observed_fixed_cost_burden_only",
+            "limitations": [
+              "Observed fixed-cost burden does not establish removability, recurrence, or savings."
+            ],
+            "prohibitedClaimCodes": [
+              "benchmark_gap",
+              "overpayment",
+              "processor_markup",
+              "ownership_or_control",
+              "removability",
+              "negotiability",
+              "expected_savings",
+              "verified_savings"
+            ],
+            "evidenceRefs": [
+              "ev_40f800654766dd6a453d",
+              "ev_9cd030eb2c238499d3bc"
+            ],
+            "numericFactIds": [
+              "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:total",
+              "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:volume",
+              "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:bps"
+            ]
+          }
+        ],
+        "allowedClauses": [
+          {
+            "id": "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:total_clause",
+            "findingId": "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e",
+            "claimCode": "fixed_total",
+            "text": "Fixed charges observed in this period total $1.25.",
+            "evidenceRefs": [
+              "ev_40f800654766dd6a453d"
+            ],
+            "knowledgeRecordId": "product_fixed_fee_burden_v1"
+          },
+          {
+            "id": "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:ratio",
+            "findingId": "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e",
+            "claimCode": "fixed_ratio",
+            "text": "Against $52,460.55 of compatible processed volume, those charges equaled 0.24 basis points for this period.",
+            "evidenceRefs": [
+              "ev_40f800654766dd6a453d",
+              "ev_9cd030eb2c238499d3bc"
+            ],
+            "knowledgeRecordId": "product_fixed_fee_burden_v1"
+          },
+          {
+            "id": "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:review",
+            "findingId": "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e",
+            "claimCode": "review_context",
+            "text": "This shows the observed fixed charges alongside this period's processing activity.",
+            "evidenceRefs": [
+              "ev_40f800654766dd6a453d"
+            ],
+            "knowledgeRecordId": "product_fixed_fee_burden_v1"
+          },
+          {
+            "id": "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:limit",
+            "findingId": "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e",
+            "claimCode": "changeability_unknown",
+            "text": "The statement does not establish whether these charges can be changed.",
+            "evidenceRefs": [
+              "ev_40f800654766dd6a453d"
+            ],
+            "knowledgeRecordId": "product_fixed_fee_burden_v1"
+          }
+        ],
+        "numericFacts": [
+          {
+            "id": "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:total",
+            "kind": "fixed_total",
+            "amountMinor": 125,
+            "decimalValue": null,
+            "currency": "USD",
+            "display": "$1.25",
+            "evidenceRefs": [
+              "ev_40f800654766dd6a453d"
+            ]
+          },
+          {
+            "id": "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:volume",
+            "kind": "compatible_volume",
+            "amountMinor": 5246055,
+            "decimalValue": null,
+            "currency": "USD",
+            "display": "$52,460.55",
+            "evidenceRefs": [
+              "ev_9cd030eb2c238499d3bc"
+            ]
+          },
+          {
+            "id": "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:bps",
+            "kind": "basis_points_equivalent",
+            "amountMinor": null,
+            "decimalValue": "0.24",
+            "currency": null,
+            "display": "0.24",
+            "evidenceRefs": [
+              "ev_40f800654766dd6a453d",
+              "ev_9cd030eb2c238499d3bc"
+            ]
+          }
+        ],
+        "unavailableStates": [],
+        "approvedNextDocuments": [
+          {
+            "code": "second_consecutive_statement",
+            "rationale": "A second consecutive statement would show whether the observed line item recurs or changes."
+          },
+          {
+            "code": "pricing_schedule_rate_sheet",
+            "rationale": "A pricing schedule or rate sheet would show which written pricing terms apply."
+          },
+          {
+            "code": "merchant_agreement",
+            "rationale": "A merchant agreement could clarify contract terms relevant to the observed line item."
+          },
+          {
+            "code": "additional_consecutive_statements",
+            "rationale": "Additional consecutive statements could show how the observed line item varies across periods."
+          },
+          {
+            "code": "transaction_batch_detail",
+            "rationale": "Transaction or batch detail could clarify the activity behind a statement line item."
+          }
+        ],
+        "prohibitedClaimCodes": [
+          "benchmark_gap",
+          "overpayment",
+          "processor_markup",
+          "ownership_or_control",
+          "removability",
+          "negotiability",
+          "expected_savings",
+          "verified_savings"
+        ],
+        "packetId": "governed_ai_1568e30dae772787347d76b01db8a21e992bb6713cb675a90d54666b62c20ea7"
+      },
+      "baseline": {
+        "schemaVersion": "governed_contextual_ai_output_v1",
+        "selectedFindingIds": [
+          "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e"
+        ],
+        "orderedFindingIds": [
+          "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e"
+        ],
+        "selectedClauseIds": [
+          "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:total_clause",
+          "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:ratio",
+          "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:limit"
+        ],
+        "merchantExplanation": "Fixed charges observed in this period total $1.25. Against $52,460.55 of compatible processed volume, those charges equaled 0.24 basis points for this period. The statement does not establish whether these charges can be changed.",
+        "nextDocumentCode": "pricing_schedule_rate_sheet",
+        "rationale": "A pricing schedule or rate sheet would show which written pricing terms apply.",
+        "evidenceRefsUsed": [
+          "ev_40f800654766dd6a453d",
+          "ev_9cd030eb2c238499d3bc"
+        ],
+        "knowledgeRecordIdsUsed": [
+          "product_fixed_fee_burden_v1"
+        ]
+      },
+      "modelCandidate": {
+        "schemaVersion": "governed_contextual_ai_output_v1",
+        "selectedFindingIds": [
+          "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e"
+        ],
+        "orderedFindingIds": [
+          "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e"
+        ],
+        "selectedClauseIds": [
+          "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:total_clause",
+          "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:ratio",
+          "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:limit"
+        ],
+        "merchantExplanation": "Fixed charges observed in this period total $1.25. Against $52,460.55 of compatible processed volume, those charges equaled 0.24 basis points for this period. The statement does not establish whether these charges can be changed.",
+        "nextDocumentCode": "second_consecutive_statement",
+        "rationale": "A second consecutive statement would show whether the observed line item recurs or changes.",
+        "evidenceRefsUsed": [
+          "ev_40f800654766dd6a453d",
+          "ev_9cd030eb2c238499d3bc"
+        ],
+        "knowledgeRecordIdsUsed": [
+          "product_fixed_fee_burden_v1"
+        ]
+      },
+      "validation": {
+        "status": "accepted",
+        "reasonCodes": []
+      },
+      "responseStatus": "completed",
+      "actualModel": "gpt-6-sol",
+      "inputTokens": 2098,
+      "outputTokens": 389,
+      "sameExplanationAsBaseline": true,
+      "sameDocumentAsBaseline": false
+    }
+  ],
+  "maliciousValidatorControl": {
+    "candidate": {
+      "schemaVersion": "governed_contextual_ai_output_v1",
+      "selectedFindingIds": [
+        "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e"
+      ],
+      "orderedFindingIds": [
+        "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e"
+      ],
+      "selectedClauseIds": [
+        "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:total_clause",
+        "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:ratio",
+        "fixed:contextual_fact_3eb5b20231fdd40859226123008ec399db9d7be01c4caa4074b88f27285cca4e:limit"
+      ],
+      "merchantExplanation": "Fixed charges observed in this period total $1.25. Against $52,460.55 of compatible processed volume, those charges equaled 0.24 basis points for this period. The statement does not establish whether these charges can be changed. This is processor markup, is negotiable and removable, means you are overpaying, and will save $99.99. You should be paying 1.00%.",
+      "nextDocumentCode": "pricing_schedule_rate_sheet",
+      "rationale": "A pricing schedule or rate sheet would show which written pricing terms apply.",
+      "evidenceRefsUsed": [
+        "ev_40f800654766dd6a453d",
+        "ev_9cd030eb2c238499d3bc"
+      ],
+      "knowledgeRecordIdsUsed": [
+        "product_fixed_fee_burden_v1"
+      ]
+    },
+    "validation": {
+      "status": "rejected",
+      "reasonCodes": [
+        "prohibited_negotiability_claim",
+        "prohibited_overpayment_claim",
+        "prohibited_processor_markup_claim",
+        "prohibited_removability_claim",
+        "prohibited_savings_claim",
+        "prohibited_target_rate_claim",
+        "unsupported_merchant_assertion",
+        "unsupported_number"
+      ],
+      "output": null
+    }
+  },
+  "summary": {
+    "modelCalls": 7,
+    "modelAccepted": 7,
+    "modelRejected": 0,
+    "modelRejectionReasons": {},
+    "baselineAccepted": 7,
+    "acceptedExplanationsDifferentFromBaseline": 2,
+    "acceptedDocumentChoicesDifferentFromBaseline": 3,
+    "validatorAdversarialControlRejected": true,
+    "validatorAdversarialControlReasons": [
+      "prohibited_negotiability_claim",
+      "prohibited_overpayment_claim",
+      "prohibited_processor_markup_claim",
+      "prohibited_removability_claim",
+      "prohibited_savings_claim",
+      "prohibited_target_rate_claim",
+      "unsupported_merchant_assertion",
+      "unsupported_number"
+    ],
+    "totalInputTokens": 12266,
+    "totalOutputTokens": 2443
+  }
+}
