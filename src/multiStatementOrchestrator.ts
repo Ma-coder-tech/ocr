@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 
 import { parsePdf } from "./parser.js";
 import { analyzeStatementDocumentWithOptionalAi } from "./statementParserOrchestrator.js";
+import { requireCustomerFinancialAuthority } from "./customerFinancialAuthority.js";
 import type { BusinessTypeId } from "./businessTypes.js";
 import type { AnalysisSummary } from "./types.js";
 import {
@@ -262,6 +263,7 @@ export async function processMultiStatementAnalysisJob(
       const summary = await analyze(document, job.businessType, {
         sourceFileName: file.originalFileName,
       });
+      requireCustomerFinancialAuthority(summary);
 
       const comparisonInput = adapt(summary, {
         sourceAnalysisId: String(file.id),

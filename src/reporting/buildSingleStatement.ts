@@ -1,4 +1,5 @@
 import { getBusinessTypeReportLabel } from "../businessTypes.js";
+import { customerFinancialsAuthorized, CUSTOMER_UNAVAILABLE_MESSAGE } from "../customerFinancialAuthority.js";
 import type { AnalysisSummary } from "../types.js";
 import { toPeriodLabel } from "../periods.js";
 import {
@@ -44,6 +45,11 @@ export function buildSingleStatementCustomerReport(input: BuildCustomerReportInp
   const summary = input.analysis;
   if (!summary) {
     return blockedReport(input.kind, "We couldn't load this statement analysis.");
+  }
+  if (!customerFinancialsAuthorized(summary)) {
+    return blockedReport(input.kind, summary.sourceType === "pdf" && !summary.parserDecision
+      ? "PDF reports require a validated parser decision before customer-facing financial metrics can be shown."
+      : CUSTOMER_UNAVAILABLE_MESSAGE);
   }
 
   const volumePermission = canShowTotalVolume(summary);

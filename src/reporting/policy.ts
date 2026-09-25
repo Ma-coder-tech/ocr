@@ -8,6 +8,7 @@ import type {
   SuspiciousFee,
 } from "../types.js";
 import { explainFeeFromReference } from "../feeReferenceExplanations.js";
+import { customerFinancialsAuthorized } from "../customerFinancialAuthority.js";
 import type { CustomerConfidence, CustomerFeeTableRow, CustomerFinding, CustomerReportMetric, ReportKind } from "./types.js";
 
 const HIGH_CONFIDENCE_SCORE = 0.8;
@@ -62,7 +63,7 @@ export function confidenceFromAnalysis(value: AnalysisSummary["confidence"] | Fe
 }
 
 export function canShowTotalVolume(summary: AnalysisSummary | undefined): PermissionResult {
-  const gate = pdfParserDecisionGate(summary);
+  const gate = parserFinancialAuthorityGate(summary);
   if (gate) return gate;
   if (!summary || !isPositiveFinite(summary.totalVolume)) {
     return { allowed: false, reason: "Total volume was not reliably extracted." };
@@ -71,7 +72,7 @@ export function canShowTotalVolume(summary: AnalysisSummary | undefined): Permis
 }
 
 export function canShowTotalFees(summary: AnalysisSummary | undefined): PermissionResult {
-  const gate = pdfParserDecisionGate(summary);
+  const gate = parserFinancialAuthorityGate(summary);
   if (gate) return gate;
   if (!summary || !isPositiveFinite(summary.totalFees)) {
     return { allowed: false, reason: "Total fees were not reliably extracted." };
@@ -96,7 +97,7 @@ export function canShowBenchmarkVerdict(summary: AnalysisSummary | undefined): P
 }
 
 export function canShowAverageTicket(summary: AnalysisSummary | undefined): PermissionResult {
-  const gate = pdfParserDecisionGate(summary);
+  const gate = parserFinancialAuthorityGate(summary);
   if (gate) return gate;
   const count = summary?.interchangeAudit?.transactionCount ?? summary?.processorMarkupAudit?.transactionCount ?? null;
   if (!summary || !isPositiveFinite(summary.totalVolume) || !isPositiveFinite(count)) {
@@ -112,7 +113,7 @@ export function averageTicket(summary: AnalysisSummary): number | null {
 }
 
 export function canShowFeeBreakdown(summary: AnalysisSummary | undefined): PermissionResult {
-  const gate = pdfParserDecisionGate(summary);
+  const gate = parserFinancialAuthorityGate(summary);
   if (gate) return gate;
   if (summary?.sourceType === "pdf" && summary.parserDecision?.validationState && !summary.parserDecision.validationState.feeClassificationAllowed) {
     return {
@@ -136,7 +137,7 @@ export function canShowTwoBucketSplit(summary: AnalysisSummary | undefined): Buc
     return { allowed: false, reason: "Two-bucket split requires reliable total fees." };
   }
 
-  const gate = pdfParserDecisionGate(summary);
+  const gate = parserFinancialAuthorityGate(summary);
   if (gate) {
     return { allowed: false, reason: gate.reason ?? "PDF reports require a validated parser decision." };
   }
@@ -239,7 +240,7 @@ function twoBucketPermissionFromAnalysis(summary: AnalysisSummary): BucketSplitP
 }
 
 export function approvedFeeRows(summary: AnalysisSummary | undefined): CustomerFeeTableRow[] {
-  if (pdfParserDecisionGate(summary)) return [];
+  if (parserFinancialAuthorityGate(summary)) return [];
   return (summary?.feeBreakdown ?? [])
     .filter((row) => isPositiveFinite(row.amount) && confidenceFromAnalysis(row.classificationConfidence) !== "low")
     .map((row) => ({
@@ -252,7 +253,7 @@ export function approvedFeeRows(summary: AnalysisSummary | undefined): CustomerF
 
 export function approvedCustomerFindings(summary: AnalysisSummary | undefined, kind: ReportKind): CustomerFinding[] {
   if (!summary) return [];
-  if (pdfParserDecisionGate(summary)) return [];
+  if (parserFinancialAuthorityGate(summary)) return [];
   const hasFiservV2Analysis = recordOrNull(summary.fiservFeeAnalysisV2) !== null;
   const findings: CustomerFinding[] = [
     ...structuredFindings(summary.structuredFeeFindings ?? [], kind),
@@ -696,8 +697,11 @@ function hasBenchmark(benchmark: BenchmarkResult | undefined): boolean {
   );
 }
 
-function pdfParserDecisionGate(summary: AnalysisSummary | undefined): PermissionResult | null {
-  if (!summary || summary.sourceType !== "pdf") return null;
+function parserFinancialAuthorityGate(summary: AnalysisSummary | undefined): PermissionResult | null {
+  if (!summary || customerFinancialsAuthorized(summary)) return null;
+  if (summary.sourceType !== "pdf") {
+    return { allowed: false, reason: "The parser did not approve customer-facing financial metrics." };
+  }
   if (!summary.parserDecision) {
     return {
       allowed: false,
@@ -705,7 +709,6 @@ function pdfParserDecisionGate(summary: AnalysisSummary | undefined): Permission
     };
   }
   if (!summary.parserDecision.reportable) {
-    if (canUseNeedsReviewFiservReport(summary)) return null;
     return {
       allowed: false,
       reason: summary.parserDecision.reason || "The parser did not approve this PDF for customer-facing financial metrics.",
@@ -715,28 +718,11 @@ function pdfParserDecisionGate(summary: AnalysisSummary | undefined): Permission
     return {
       allowed: false,
       reason:
-        summary.parserDecision.validationState.blockingReasons.join(" ") ||
+        summary.parserDecision.validationState.blockingReasons?.join(" ") ||
         "The parser did not validate customer-facing PDF financial totals.",
     };
   }
   return null;
-}
-
-function canUseNeedsReviewFiservReport(summary: AnalysisSummary): boolean {
-  const reason = summary.parserDecision?.reason ?? "";
-  const analysis = recordOrNull(summary.fiservFeeAnalysisV2);
-  const reconciliation = recordOrNull(analysis?.reconciliation);
-  const reconciliationStatus = stringValue(reconciliation?.status);
-  return (
-    summary.parserDecision?.status === "needs_review" &&
-    /supportingVolumeAgreement/i.test(reason) &&
-    isPositiveFinite(summary.totalVolume) &&
-    isPositiveFinite(summary.totalFees) &&
-    isPositiveFinite(summary.effectiveRate) &&
-    (summary.feeBreakdown?.length ?? 0) > 0 &&
-    arrayOfRecords(analysis?.findings).length > 0 &&
-    (reconciliationStatus === "pass" || reconciliationStatus === "warning")
-  );
 }
 
 function reportableConfidence(value: AnalysisSummary["confidence"] | FeeClassificationConfidence | undefined): CustomerConfidence {

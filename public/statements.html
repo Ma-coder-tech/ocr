@@ -49,7 +49,7 @@
       function analysisStatusLabel(status) {
         if (status === "completed") return "Completed";
         if (status === "processing") return "Processing";
-        if (status === "failed") return "Failed";
+        if (status === "failed") return "Unable to analyze";
         return String(status || "Processing");
       }
 
@@ -110,8 +110,10 @@
                   const action =
                     isCompleted
                       ? `<a class="secondary-btn compact-btn" href="${statementReportHref(statement)}">Report →</a>`
-                      : statement.analysisStatus === "failed"
+                      : statement.analysisStatus === "failed" && statement.kind === "job"
                         ? `<button class="secondary-btn compact-btn" type="button" data-retry-job="${escapeHtml(statement.jobId || statement.sourceJobId || "")}">Retry</button>`
+                        : statement.analysisStatus === "failed"
+                          ? '<span class="file-meta">Unavailable</span>'
                         : `<a class="secondary-btn compact-btn" href="/dashboard/statements/analyze?job=${encodeURIComponent(statement.jobId || statement.sourceJobId || "")}">View progress</a>`;
                   const periodLabel = escapeHtml(formatPeriodLabel(statement.period) || statement.period);
                   return `
@@ -126,10 +128,10 @@
                         ${statement.error ? `<div class="inline-error">${escapeHtml(statement.error)}</div>` : ""}
                       </td>
                       <td>${escapeHtml(statement.processorName || "Processor not identified")}</td>
-                      <td>${metricCell(statement.totalVolume, formatMoney)}</td>
-                      <td>${metricCell(statement.totalFees, formatMoney)}</td>
+                      <td>${statement.analysisStatus === "failed" ? '<span class="file-meta">Unavailable</span>' : metricCell(statement.totalVolume, formatMoney)}</td>
+                      <td>${statement.analysisStatus === "failed" ? '<span class="file-meta">Unavailable</span>' : metricCell(statement.totalFees, formatMoney)}</td>
                       <td>
-                        ${isCompleted ? `<strong>${formatPct(statement.effectiveRate)}</strong><div class="inline-note"><span class="verdict-pill ${verdictClass}">${escapeHtml(verdictLabel(statement.benchmarkVerdict))}</span></div>` : '<span class="file-meta">Pending</span>'}
+                        ${isCompleted ? `<strong>${formatPct(statement.effectiveRate)}</strong><div class="inline-note"><span class="verdict-pill ${verdictClass}">${escapeHtml(verdictLabel(statement.benchmarkVerdict))}</span></div>` : `<span class="file-meta">${statement.analysisStatus === "failed" ? "Unavailable" : "Pending"}</span>`}
                       </td>
                       <td><span class="status-pill ${statusTone}">${escapeHtml(analysisStatusLabel(statement.analysisStatus))}</span></td>
                       <td>${action}</td>

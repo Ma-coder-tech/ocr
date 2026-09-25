@@ -14,6 +14,7 @@ import { BUSINESS_TYPE_IDS, type BusinessTypeId } from "./businessTypes.js";
 import { db, nowIso } from "./db.js";
 import { formatPeriodKey, parsePeriodKey } from "./periods.js";
 import { sessionExpiryIso } from "./auth.js";
+import { customerFinancialsAuthorized, requireCustomerFinancialAuthority } from "./customerFinancialAuthority.js";
 import { isCardBrandPassThrough, isProcessorCoreFee } from "./feeClassification.js";
 
 export type MerchantAccount = {
@@ -515,6 +516,12 @@ export function getStatementsForMerchant(merchantId: number): StatementRecord[] 
   return rows.map((row) => mapStatement(row)!).filter(Boolean);
 }
 
+/** Customer-eligible saved statements; raw rows remain available for audit/history. */
+export function getAuthorizedStatementsForMerchant(merchantId: number): StatementRecord[] {
+  return getStatementsForMerchant(merchantId)
+    .filter((statement) => customerFinancialsAuthorized(statement.analysisSummary));
+}
+
 export function getCompletedStatementCountForMerchant(merchantId: number): number {
   const row = db.prepare(`SELECT COUNT(*) AS count FROM statements WHERE merchant_id = ?`).get(merchantId) as { count: number };
   return Number(row.count);
@@ -538,6 +545,7 @@ export function persistStatementFromSummary(input: {
   sourceJobId?: string | null;
   preferredPeriodKey?: string | null;
 }): StatementRecord {
+  requireCustomerFinancialAuthority(input.summary);
   const tx = db.transaction(() => {
     const periodKey = input.preferredPeriodKey ?? parsePeriodKey(input.summary.statementPeriod);
     if (!periodKey) {
@@ -703,6 +711,8 @@ export function createOrReplaceComparison(merchantId: number): ComparisonRecord 
     if (!statement1 || !statement2) {
       throw new Error("Both statements are required before comparison can be created.");
     }
+    requireCustomerFinancialAuthority(statement1.analysisSummary);
+    requireCustomerFinancialAuthority(statement2.analysisSummary);
 
     const effectiveRateDelta = round2(statement2.effectiveRate - statement1.effectiveRate);
     const feesDelta = round2(statement2.totalFees - statement1.totalFees);
@@ -780,7 +790,13 @@ export function getComparisonForMerchant(merchantId: number): ComparisonRecord |
   const row = db
     .prepare(`SELECT * FROM comparisons WHERE merchant_id = ?`)
     .get(merchantId) as Record<string, unknown> | undefined;
-  return mapComparison(row);
+  const comparison = mapComparison(row);
+  if (!comparison) return null;
+  const statement1 = getStatementByIdForMerchant(comparison.statement1Id, merchantId);
+  const statement2 = getStatementByIdForMerchant(comparison.statement2Id, merchantId);
+  return statement1 && statement2
+    && customerFinancialsAuthorized(statement1.analysisSummary)
+    && customerFinancialsAuthorized(statement2.analysisSummary) ? comparison : null;
 }
 
 export function setMerchantChosenPath(merchantId: number, chosenPath: "audit" | "monitor"): void {
@@ -846,11 +862,15 @@ export function claimStatementOneJob(input: {
   merchantId: number;
   job: Job;
 }): StatementRecord {
-  if (!input.job.summary) {
+  if (input.job.status !== "completed" || !input.job.summary) {
     throw new Error("Statement analysis is not complete yet.");
   }
 
   const summary = input.job.summary;
+  requireCustomerFinancialAuthority(summary);
+  if (getStatementByMerchantSlot(input.merchantId, 1)) {
+    throw new Error("A first statement is already saved for this merchant.");
+  }
   const periodKey = parsePeriodKey(summary.statementPeriod) ?? parsePeriodKey(input.job.detectedStatementPeriod ?? "") ?? null;
   const claimed = persistStatementFromSummary({
     merchantId: input.merchantId,

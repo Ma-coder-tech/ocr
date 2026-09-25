@@ -13,6 +13,10 @@ function makeSummary(period = "2024-10", totalVolume = 1000) {
     businessType: "retail" as const,
     processorName: "Test Processor",
     sourceType: "pdf" as const,
+    parserDecision: { status: "accepted" as const, reportable: true,
+      confidence: "high" as const, reason: "fixture",
+      validationState: { customerFacingTotalsAllowed: true, feeClassificationAllowed: true,
+        blockingReasons: [] } },
     statementPeriod: period,
     executiveSummary: "Test summary",
     totalVolume,
@@ -263,6 +267,44 @@ describe("statement dashboard routes", () => {
     expect(payload.statements).toHaveLength(1);
     expect(payload.items).toHaveLength(1);
     expect(payload.statements[0].periodKey).toBe("2024-10");
+  });
+
+  it("redacts a historical nonreportable statement across customer APIs", async () => {
+    accountStore.persistStatementFromSummary({ merchantId, slot: 2,
+      summary: makeSummary("2024-11"), sourceJobId: "authorized-second" });
+    accountStore.createOrReplaceComparison(merchantId);
+    const first = accountStore.getStatementByMerchantSlot(merchantId, 1)!;
+    const accepted = makeSummary("2024-10");
+    const denied = { ...accepted, estimatedAnnualSavings: 1188.12,
+      parserDecision: { ...accepted.parserDecision, status: "needs_review" as const,
+        reportable: false, validationState: { ...accepted.parserDecision.validationState,
+          customerFacingTotalsAllowed: false } } };
+    dbModule.db.prepare("UPDATE statements SET analysis_summary_json = ? WHERE id = ?")
+      .run(JSON.stringify(denied), first.id);
+
+    const historicalJob = store.createJob({ fileName: "historical.pdf", filePath: "/tmp/historical.pdf",
+      fileType: "pdf", businessType: "retail", merchantId, statementSlot: 1 });
+    store.updateJob(historicalJob.id, { status: "completed", summary: denied });
+
+    const library = await api("/api/dashboard/statements");
+    expect(library.response.status).toBe(200);
+    expect(library.payload.merchant.statementCount).toBe(1);
+    expect(library.payload.merchant.freeStatementsRemaining).toBe(10);
+    expect(library.payload.statements[0]).toMatchObject({ analysisStatus: "failed",
+      totalVolume: null, totalFees: null, effectiveRate: null, benchmarkVerdict: null });
+    expect(JSON.stringify(library.payload)).not.toContain("1188.12");
+    expect((await api("/api/dashboard/report")).response.status).toBe(404);
+    const detail = await api(`/api/dashboard/statements/${first.id}/report`);
+    expect(detail.response.status).toBe(409);
+    expect(detail.payload.statement.totalVolume).toBeNull();
+    expect(detail.payload.statement.effectiveRate).toBeNull();
+    expect((await api("/api/dashboard/comparison")).response.status).toBe(404);
+    const audit = await api("/api/dashboard/audit");
+    expect(audit.payload.audit.statementCount).toBe(1);
+    expect((await api("/api/dashboard/statements/upload-context")).response.status).toBe(404);
+    const job = await api(`/api/dashboard/jobs/${historicalJob.id}`);
+    expect(job.payload).toMatchObject({ status: "failed", customerReport: null });
+    expect(job.payload.summary).toBeUndefined();
   });
 
   it("returns aggregate audit data for the saved statement library", async () => {

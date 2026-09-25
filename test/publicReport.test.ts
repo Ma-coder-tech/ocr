@@ -29,6 +29,8 @@ function summaryWithChecklist(): AnalysisSummary {
     benchmark: { status: "within", lowerRate: 2, upperRate: 4 },
     confidence: "high",
     dataQuality: [],
+    parserDecision: { status: "accepted", reportable: true, confidence: "high",
+      reason: "Validated test statement." },
     checklistReport: {
       extractionMode: "structured",
       extractionQualityScore: 92,

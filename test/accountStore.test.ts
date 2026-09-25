@@ -164,6 +164,8 @@ function makeSummary(
     dynamicFields: [],
     insights: [],
     confidence: "medium" as const,
+    parserDecision: { status: "accepted" as const, reportable: true,
+      confidence: "high" as const, reason: "Validated test statement." },
   };
 }
 

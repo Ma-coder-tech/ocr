@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { setTimeout as delay } from "node:timers/promises";
-import { createOrReplaceComparison, getStatementsForMerchant, persistStatementFromSummary } from "./accountStore.js";
+import { createOrReplaceComparison, getAuthorizedStatementsForMerchant, persistStatementFromSummary } from "./accountStore.js";
+import { customerFinancialsAuthorized, CUSTOMER_UNAVAILABLE_MESSAGE } from "./customerFinancialAuthority.js";
 import type { AnalysisSummary } from "./types.js";
 import { detectPreflightFailure } from "./preflight.js";
 import {
@@ -204,6 +205,13 @@ export async function processJob(jobId: string): Promise<void> {
     if (stageDelayMs > 0) await delay(stageDelayMs);
 
     let summary = await analyzeStatementDocumentWithOptionalAi(parsed, job.businessType, { sourceFileName: job.fileName });
+    if (!customerFinancialsAuthorized(summary)) {
+      // Retain the parser observation for internal audit. It cannot complete a
+      // customer analysis, enter saved statements, or feed any comparison.
+      updateJob(jobId, { status: "failed", progress: 100, error: CUSTOMER_UNAVAILABLE_MESSAGE,
+        summary, nextRunAt: null }, "Statement requires review; financial output withheld");
+      return;
+    }
     if (isSupportedFiservAnalysis(summary)) {
       console.log(`[job:${jobId}] ai-provider-authority`, supportedFiservLegacyAiContainmentTelemetry());
     }
@@ -257,7 +265,7 @@ export async function processJob(jobId: string): Promise<void> {
     try {
       const previousStatement =
         job.merchantId && job.statementSlot
-          ? getStatementsForMerchant(job.merchantId)
+          ? getAuthorizedStatementsForMerchant(job.merchantId)
               .filter((statement) => statement.slot < job.statementSlot!)
               .sort((left, right) => right.slot - left.slot)[0] ?? null
           : null;

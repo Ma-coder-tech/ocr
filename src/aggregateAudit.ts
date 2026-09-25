@@ -1,4 +1,5 @@
 import type { StatementRecord } from "./accountStore.js";
+import { requireCustomerFinancialAuthority } from "./customerFinancialAuthority.js";
 import { detectFeeDrift } from "./feeDrift.js";
 import { collectFeeFacts, mergeConfidence, type FeeFact } from "./feeFacts.js";
 import type {
@@ -521,6 +522,7 @@ function buildVerdict(input: {
 }
 
 export function buildAggregateAudit(statements: StatementRecord[]): AggregateAuditReport {
+  for (const statement of statements) requireCustomerFinancialAuthority(statement.analysisSummary);
   const months = sortedStatements(statements).map(toAuditMonth);
   const trends = buildTrends(months);
   const feeChanges = buildFeeChanges(months);
