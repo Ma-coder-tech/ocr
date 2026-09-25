@@ -1,0 +1,224 @@
+{
+  "schemaVersion": "phase01_authority_matrix_v1",
+  "baseCommit": "7b705023eaa593d298ffa6455be9224536d17822",
+  "remediationCommit": "e4877aa578668b0cc9458e7ac9b6fb317bf65bf9",
+  "cases": [
+    {
+      "file": "fiserv_OFFICIAL_INTERCHANGE_PLUS_SAMPLE.pdf",
+      "inputSha256": "2e84e1fbe1cb49886a129a5e7d7fce46853cfa3175361a975e82b35cd68b30a2",
+      "legacy": {
+        "driverId": null,
+        "reportable": null,
+        "volume": 956.9,
+        "fees": 20.29,
+        "savings": 0,
+        "reportState": "unable_to_analyze"
+      },
+      "canonicalV1": {
+        "f1Claims": 29,
+        "f1Unknown": 22,
+        "customerState": "unable_to_analyze",
+        "fullSha256": "e2fbb0c9378ab28da6f325f0711c2bb6f4fdccf32d71ddd17bf0f4e181a3c3d9"
+      },
+      "canonicalV2": {
+        "status": "failed",
+        "financialFacts": 0,
+        "reconciliationControls": 0,
+        "unresolvedClaims": 0,
+        "supportState": null,
+        "outputStates": [],
+        "fullSha256": "775559c468001dcb7104c4ca24400db1c20a20b38d8f289dfc7a455874410eb2"
+      },
+      "activeRuntimeSha256": "3ac56cc52e95bd5c9b4c3098d0d54c1ad0f030fed591af2bab69a7444fd913ac",
+      "shadowSha256": "67b5829fcc58c7ee5508e7a928107fc17bdfcd71505256e68993a3cf799e357c"
+    },
+    {
+      "file": "Nov_2024_Statement.pdf",
+      "inputSha256": "2a3b929509ff6ef10e2dacec879f239685e16b598fe40e34fd1388ec6e0d09fb",
+      "legacy": {
+        "driverId": "fiserv_first_data_full_statement",
+        "reportable": false,
+        "volume": 53291.02,
+        "fees": 1330.96,
+        "savings": 1188.12,
+        "reportState": "unable_to_analyze"
+      },
+      "canonicalV1": {
+        "f1Claims": 1138,
+        "f1Unknown": 964,
+        "customerState": "analysis_limited",
+        "fullSha256": "eedb1e019d4a78381f7e2ebf23bf4270ad9fc04e0adb6c6b4099c0d06858ac5b"
+      },
+      "canonicalV2": {
+        "status": "completed_with_limitations",
+        "financialFacts": 19,
+        "reconciliationControls": 55,
+        "unresolvedClaims": 539,
+        "supportState": "recognized_but_insufficient",
+        "outputStates": [
+          "statement_period_source_identity:permitted",
+          "net_submitted_volume:withheld",
+          "total_processing_fees:withheld",
+          "headline_effective_rate:withheld",
+          "gross_sales_refunds:withheld",
+          "transaction_count:permitted",
+          "average_ticket:withheld",
+          "partial_fee_inventory:limited",
+          "complete_fee_inventory:withheld",
+          "partial_fee_composition:limited",
+          "complete_fee_composition:withheld",
+          "funding_batch_analysis:withheld",
+          "pricing_architecture:downstream_gated",
+          "economic_roles:downstream_gated",
+          "recurrence:downstream_gated",
+          "savings_impact:downstream_gated",
+          "merchant_action:downstream_gated"
+        ],
+        "fullSha256": "de6f9af29f0ea5865df6f9255c653ef6d3e71cc37b53e98af260dc1073db458d"
+      },
+      "activeRuntimeSha256": "d77b40f4d490d0b2799248e8ce7b1581dcc4bbe348b69715e0f87925f9850793",
+      "shadowSha256": "4c29b15a81c9750547327796296960b414063b63a0dac14ca1a3a7d420ff783a"
+    },
+    {
+      "file": "fiserv_PAYSAFE_Febr_2024.pdf",
+      "inputSha256": "3d7d28a041a47edae565f01f5376e56e3748f27227f9c4bca8a0a6f424f6b7ca",
+      "legacy": {
+        "driverId": "fiserv_first_data_processor_statement",
+        "reportable": true,
+        "volume": 36912.94,
+        "fees": 1565.73,
+        "savings": 10881.48,
+        "reportState": null
+      },
+      "canonicalV1": {
+        "f1Claims": 274,
+        "f1Unknown": 212,
+        "customerState": "analysis_limited",
+        "fullSha256": "7aa773beb9f90f3f0453ffa4d8000c7c50a6625c2b4f1958d1e9798ff3888d6d"
+      },
+      "canonicalV2": {
+        "status": "completed_with_limitations",
+        "financialFacts": 19,
+        "reconciliationControls": 35,
+        "unresolvedClaims": 91,
+        "supportState": "unsupported_document_class",
+        "outputStates": [
+          "statement_period_source_identity:withheld",
+          "net_submitted_volume:withheld",
+          "total_processing_fees:withheld",
+          "headline_effective_rate:withheld",
+          "gross_sales_refunds:withheld",
+          "transaction_count:withheld",
+          "average_ticket:withheld",
+          "partial_fee_inventory:withheld",
+          "complete_fee_inventory:withheld",
+          "partial_fee_composition:withheld",
+          "complete_fee_composition:withheld",
+          "funding_batch_analysis:withheld",
+          "pricing_architecture:downstream_gated",
+          "economic_roles:downstream_gated",
+          "recurrence:downstream_gated",
+          "savings_impact:downstream_gated",
+          "merchant_action:downstream_gated"
+        ],
+        "fullSha256": "7b46c34b619c78ea85a8661baaea6b045cae22551b2c2e2ff0295eabbff9b5e2"
+      },
+      "activeRuntimeSha256": "98cc885e0f672195110821c110e503f1b8b6d265d499712c787732b713ccdfac",
+      "shadowSha256": "d84b65e44dd2ff038a70702df7de34e4d072296f8c9d5fbd0a4f676c5c1eba8f"
+    },
+    {
+      "file": "fiserv_BASYS_JEFES_TACOS_Mar_2020.pdf",
+      "inputSha256": "25818af711fdcd1fec7b764fa95fa255306fda52ee223b31091311cafb1cc4d8",
+      "legacy": {
+        "driverId": "generic_fiserv_family_statement",
+        "reportable": true,
+        "volume": 171283.93,
+        "fees": 3552.45,
+        "savings": 249.12,
+        "reportState": "low_confidence"
+      },
+      "canonicalV1": {
+        "f1Claims": 910,
+        "f1Unknown": 760,
+        "customerState": "analysis_limited",
+        "fullSha256": "3a958e9b3a0f3bb96d51d3e0480b39cb11a1fdb19f118974f638f9f4bbd1d74b"
+      },
+      "canonicalV2": {
+        "status": "completed_with_limitations",
+        "financialFacts": 19,
+        "reconciliationControls": 10,
+        "unresolvedClaims": 423,
+        "supportState": "unsupported_document_class",
+        "outputStates": [
+          "statement_period_source_identity:withheld",
+          "net_submitted_volume:withheld",
+          "total_processing_fees:withheld",
+          "headline_effective_rate:withheld",
+          "gross_sales_refunds:withheld",
+          "transaction_count:withheld",
+          "average_ticket:withheld",
+          "partial_fee_inventory:withheld",
+          "complete_fee_inventory:withheld",
+          "partial_fee_composition:withheld",
+          "complete_fee_composition:withheld",
+          "funding_batch_analysis:withheld",
+          "pricing_architecture:downstream_gated",
+          "economic_roles:downstream_gated",
+          "recurrence:downstream_gated",
+          "savings_impact:downstream_gated",
+          "merchant_action:downstream_gated"
+        ],
+        "fullSha256": "9e21151998e3148e9d829e9d0639f39b963236a22c99cf1132bba39c23b2cdb2"
+      },
+      "activeRuntimeSha256": "de677c525b38175dcf7f6b3f70f012e38ef66af0349fc70141986e9cd53ff3b3",
+      "shadowSha256": "1ca95f0c0b8c9fd0c1c07f1f0d033cfae868bae4f310cad9a386dcc0e0656a34"
+    },
+    {
+      "file": "fiserv_PAYSAFE_PHILIP_FUTURMARKET_Sep_2025_zero_volume.pdf",
+      "inputSha256": "85ad4d064b9a5a3d808b509e0939f53742134cb18804ee572632b018c2bc2cd8",
+      "legacy": {
+        "driverId": "fiserv_first_data_processor_statement",
+        "reportable": true,
+        "volume": 0,
+        "fees": 44.9,
+        "savings": 83.4,
+        "reportState": null
+      },
+      "canonicalV1": {
+        "f1Claims": 97,
+        "f1Unknown": 59,
+        "customerState": "unable_to_analyze",
+        "fullSha256": "a4776cc278a3fcb3d2d529f12eac567f66be4e7517756a19d52837dff1343da3"
+      },
+      "canonicalV2": {
+        "status": "completed_with_limitations",
+        "financialFacts": 19,
+        "reconciliationControls": 17,
+        "unresolvedClaims": 23,
+        "supportState": "unsupported_document_class",
+        "outputStates": [
+          "statement_period_source_identity:withheld",
+          "net_submitted_volume:withheld",
+          "total_processing_fees:withheld",
+          "headline_effective_rate:withheld",
+          "gross_sales_refunds:withheld",
+          "transaction_count:withheld",
+          "average_ticket:withheld",
+          "partial_fee_inventory:withheld",
+          "complete_fee_inventory:withheld",
+          "partial_fee_composition:withheld",
+          "complete_fee_composition:withheld",
+          "funding_batch_analysis:withheld",
+          "pricing_architecture:downstream_gated",
+          "economic_roles:downstream_gated",
+          "recurrence:downstream_gated",
+          "savings_impact:downstream_gated",
+          "merchant_action:downstream_gated"
+        ],
+        "fullSha256": "331e3066a370a6ab1043e522e820022371bc03a550c47638c4d375afe75f6456"
+      },
+      "activeRuntimeSha256": "fb145afc54cda62c7f6ffa7f56a4f8c54f02d8388d341541e95a1248a158d7a0",
+      "shadowSha256": "7374adf84641ab5c613df28f1984ad0a6c8bbb1e239b2868b5bacc8f3c45c029"
+    }
+  ]
+}

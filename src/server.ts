@@ -27,6 +27,7 @@ import {
   getStatementByIdForMerchant,
   getStatementByMerchantSlot,
   getStatementsForMerchant,
+  getAuthorizedStatementsForMerchant,
   getStatementUploadForMerchant,
   MAX_COMPLETED_STATEMENTS_PER_MERCHANT,
   resetMerchantDevState,
@@ -55,6 +56,9 @@ import { detectPeriodKeyFromFileName, formatPeriodKey, inferPeriodKeyFromText, p
 import { parsePdf } from "./parser.js";
 import { detectPreflightFailure } from "./preflight.js";
 import { toPublicReportSummary } from "./publicReport.js";
+import { customerFinancialsAuthorized, CUSTOMER_UNAVAILABLE_MESSAGE } from "./customerFinancialAuthority.js";
+import { customerJobError, customerJobStatus,
+  customerStatementSummaryPayload as statementSummaryPayload } from "./customerFinancialProjection.js";
 import { buildSingleStatementCustomerReport } from "./reporting/index.js";
 import { buildSingleStatementReportV1, buildUnableToAnalyzeReportV1 } from "./reporting/v1/index.js";
 import type { SingleStatementReportV1 } from "./reporting/v1/index.js";
@@ -89,6 +93,11 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 function reportV1ForJob(job: Job): SingleStatementReportV1 | null {
   if (!reportV1Enabled) return null;
   try {
+    if (job.summary && !customerFinancialsAuthorized(job.summary)) {
+      return buildUnableToAnalyzeReportV1({ reportId: `job_${job.id}`,
+        generatedAt: job.updatedAt, sourceFileName: job.fileName,
+        reason: CUSTOMER_UNAVAILABLE_MESSAGE });
+    }
     if (job.summary) {
       return buildSingleStatementReportV1({
         analysis: job.summary,
@@ -116,6 +125,10 @@ function reportV1ForJob(job: Job): SingleStatementReportV1 | null {
 function reportV1ForStatement(statement: { id: number; updatedAt: string; analysisSummary: AnalysisSummary }): SingleStatementReportV1 | null {
   if (!reportV1Enabled) return null;
   try {
+    if (!customerFinancialsAuthorized(statement.analysisSummary)) {
+      return buildUnableToAnalyzeReportV1({ reportId: `statement_${statement.id}`,
+        generatedAt: statement.updatedAt, reason: CUSTOMER_UNAVAILABLE_MESSAGE });
+    }
     return buildSingleStatementReportV1({
       analysis: statement.analysisSummary,
       reportId: `statement_${statement.id}`,
@@ -126,6 +139,10 @@ function reportV1ForStatement(statement: { id: number; updatedAt: string; analys
     console.error("Failed to build SingleStatementReportV1", error);
     return null;
   }
+}
+
+function customerStatement<T extends { analysisSummary: AnalysisSummary }>(statement: T | null): T | null {
+  return statement && customerFinancialsAuthorized(statement.analysisSummary) ? statement : null;
 }
 
 type RateLimitEntry = {
@@ -324,16 +341,15 @@ function applyRateLimit(req: IncomingMessage, res: ServerResponse, pathname: str
 }
 
 function maybeClaimPendingStatementOne(merchantId: number, pendingJobId: string | null | undefined): boolean {
-  if (getStatementByMerchantSlot(merchantId, 1)) {
-    return true;
-  }
+  const existing = getStatementByMerchantSlot(merchantId, 1);
+  if (existing) return customerFinancialsAuthorized(existing.analysisSummary);
 
   if (!pendingJobId) {
     return false;
   }
 
   const job = getJob(pendingJobId);
-  if (!job?.summary) {
+  if (job?.status !== "completed" || !job.summary || !customerFinancialsAuthorized(job.summary)) {
     return false;
   }
 
@@ -825,8 +841,12 @@ async function handleSignUp(req: IncomingMessage, res: ServerResponse): Promise<
 
   const statementJobId = body.statementJobId ? String(body.statementJobId) : readPendingStatementJobId(req) ?? "";
   const job = statementJobId ? getJob(statementJobId) : undefined;
-  if (statementJobId && (!job || !job.summary)) {
+  if (statementJobId && (job?.status !== "completed" || !job.summary)) {
     json(res, 400, { error: "Your first statement is no longer available. Please upload it again before creating the account." });
+    return;
+  }
+  if (job?.summary && !customerFinancialsAuthorized(job.summary)) {
+    json(res, 400, { error: CUSTOMER_UNAVAILABLE_MESSAGE });
     return;
   }
   if (job?.summary && !parsePeriodKey(job.summary.statementPeriod) && !parsePeriodKey(job.detectedStatementPeriod ?? "")) {
@@ -851,7 +871,7 @@ async function handleSignUp(req: IncomingMessage, res: ServerResponse): Promise<
   setSessionCookie(req, res, token);
   clearPendingStatementJobCookie(req, res);
 
-  const hasStatement1 = Boolean(job) || Boolean(getStatementByMerchantSlot(merchant.id, 1));
+  const hasStatement1 = Boolean(job) || Boolean(customerStatement(getStatementByMerchantSlot(merchant.id, 1)));
   json(res, 201, { redirectTo: hasStatement1 ? "/dashboard/report" : "/" });
 }
 
@@ -886,7 +906,8 @@ async function handleSignIn(req: IncomingMessage, res: ServerResponse): Promise<
   const statementJobId = body.statementJobId ? String(body.statementJobId) : readPendingStatementJobId(req) ?? "";
   if (statementJobId && !getStatementByMerchantSlot(merchant.id, 1)) {
     const job = getJob(statementJobId);
-    if (job?.summary && (parsePeriodKey(job.summary.statementPeriod) || parsePeriodKey(job.detectedStatementPeriod ?? ""))) {
+    if (job?.status === "completed" && job.summary && customerFinancialsAuthorized(job.summary)
+      && (parsePeriodKey(job.summary.statementPeriod) || parsePeriodKey(job.detectedStatementPeriod ?? ""))) {
       claimStatementOneJob({ merchantId: merchant.id, job });
     }
   }
@@ -897,7 +918,7 @@ async function handleSignIn(req: IncomingMessage, res: ServerResponse): Promise<
   clearPendingStatementJobCookie(req, res);
 
   const hasComparison = Boolean(getComparisonForMerchant(merchant.id));
-  const hasStatement1 = Boolean(getStatementByMerchantSlot(merchant.id, 1));
+  const hasStatement1 = Boolean(customerStatement(getStatementByMerchantSlot(merchant.id, 1)));
   json(res, 200, {
     redirectTo: hasComparison ? "/dashboard/comparison" : hasStatement1 ? "/dashboard/report" : "/",
   });
@@ -913,36 +934,13 @@ async function handleSignOut(req: IncomingMessage, res: ServerResponse): Promise
   json(res, 200, { ok: true, redirectTo: "/" });
 }
 
-function statementSummaryPayload(statement: NonNullable<ReturnType<typeof getStatementByMerchantSlot>>): Record<string, unknown> {
-  return {
-    kind: "statement",
-    id: statement.id,
-    jobId: statement.sourceJobId,
-    slot: statement.slot,
-    period: merchantPeriodLabel(statement.statementPeriod) ?? statement.statementPeriod,
-    periodKey: statement.periodKey,
-    processorName: statement.processorName ?? "Processor not identified",
-    businessType: getBusinessTypeReportLabel(statement.businessType),
-    totalVolume: statement.totalVolume,
-    totalFees: statement.totalFees,
-    effectiveRate: statement.effectiveRate,
-    analysisStatus: statement.analysisStatus,
-    benchmarkVerdict: statement.benchmarkVerdict,
-    processorMarkup: statement.processorMarkup,
-    processorMarkupBps: statement.processorMarkupBps,
-    cardNetworkFees: statement.cardNetworkFees,
-    sourceJobId: statement.sourceJobId,
-    createdAt: statement.createdAt,
-    updatedAt: statement.updatedAt,
-  };
-}
-
 function isProcessingJobStatus(status: Job["status"]): boolean {
   return status !== "completed" && status !== "failed";
 }
 
 function statementJobPayload(job: Job): Record<string, unknown> {
-  const status = job.status === "failed" ? "failed" : isProcessingJobStatus(job.status) ? "processing" : "completed";
+  const publicStatus = customerJobStatus(job);
+  const status = publicStatus === "failed" ? "failed" : isProcessingJobStatus(publicStatus) ? "processing" : "completed";
   return {
     kind: "job",
     id: `job:${job.id}`,
@@ -957,12 +955,12 @@ function statementJobPayload(job: Job): Record<string, unknown> {
     totalFees: null,
     effectiveRate: null,
     analysisStatus: status,
-    jobStatus: job.status,
+    jobStatus: publicStatus,
     progress: job.progress,
     attemptCount: job.attemptCount,
     maxAttempts: job.maxAttempts,
     nextRunAt: job.nextRunAt,
-    error: job.error,
+    error: customerJobError(job),
     sourceJobId: job.id,
     createdAt: job.createdAt,
     updatedAt: job.updatedAt,
@@ -976,7 +974,7 @@ function statementLibraryItems(merchantId: number): Array<Record<string, unknown
     completedStatements.map((statement) => `${statement.slot}:${statement.periodKey}`),
   );
   const inFlightOrFailedJobs = listStatementJobsForMerchant(merchantId).filter((job) => {
-    if (job.status === "completed") return false;
+    if (customerJobStatus(job) === "completed") return false;
     if (job.id && completedByJobId.has(job.id)) return false;
     const completedSlotPeriodKey = job.statementSlot && job.detectedStatementPeriod ? `${job.statementSlot}:${job.detectedStatementPeriod}` : "";
     if (!job.replaceStatementId && completedSlotPeriodKey && completedBySlotAndPeriod.has(completedSlotPeriodKey)) {
@@ -1019,13 +1017,14 @@ function parseConfirmedPeriodKey(value: unknown): string | null | undefined {
 async function handleStatementLibraryData(res: ServerResponse, merchant: AuthenticatedContext): Promise<void> {
   const statements = getStatementsForMerchant(merchant.merchantId);
   const items = statementLibraryItems(merchant.merchantId);
+  const authorizedCount = getAuthorizedStatementsForMerchant(merchant.merchantId).length;
   const remaining = Math.max(0, MAX_COMPLETED_STATEMENTS_PER_MERCHANT - statements.length);
   json(res, 200, {
     merchant: {
       firstName: merchant.firstName,
       lastName: merchant.lastName,
       initials: merchant.initials,
-      statementCount: statements.length,
+      statementCount: authorizedCount,
       statementItemCount: items.length,
       statementLimit: MAX_COMPLETED_STATEMENTS_PER_MERCHANT,
       freeStatementsRemaining: remaining,
@@ -1037,7 +1036,7 @@ async function handleStatementLibraryData(res: ServerResponse, merchant: Authent
 }
 
 async function handleAggregateAuditData(res: ServerResponse, merchant: AuthenticatedContext): Promise<void> {
-  const statements = getStatementsForMerchant(merchant.merchantId);
+  const statements = getAuthorizedStatementsForMerchant(merchant.merchantId);
   if (!statements.length) {
     json(res, 404, { error: "At least one completed statement is required before the aggregate audit is available." });
     return;
@@ -1059,7 +1058,7 @@ async function handleAggregateAuditData(res: ServerResponse, merchant: Authentic
 
 async function handleValidateStatementUpload(req: IncomingMessage, res: ServerResponse, merchant: AuthenticatedContext): Promise<void> {
   const statements = getStatementsForMerchant(merchant.merchantId);
-  const statement1 = getStatementByMerchantSlot(merchant.merchantId, 1);
+  const statement1 = customerStatement(getStatementByMerchantSlot(merchant.merchantId, 1));
   if (!statement1) {
     json(res, 400, { error: "You need to finish your first statement before adding another month." });
     return;
@@ -1174,7 +1173,8 @@ async function handleStartStatementAnalysis(req: IncomingMessage, res: ServerRes
       return;
     }
     const statement =
-      existingUploadJob.status === "completed" ? getStatementBySourceJobIdForMerchant(existingUploadJob.id, merchant.merchantId) : null;
+      customerJobStatus(existingUploadJob) === "completed"
+        ? customerStatement(getStatementBySourceJobIdForMerchant(existingUploadJob.id, merchant.merchantId)) : null;
     const redirectTo =
       statement && statement.slot === 2 && getComparisonForMerchant(merchant.merchantId)
         ? "/dashboard/comparison"
@@ -1185,7 +1185,7 @@ async function handleStartStatementAnalysis(req: IncomingMessage, res: ServerRes
     return;
   }
 
-  const statement1 = getStatementByMerchantSlot(merchant.merchantId, 1);
+  const statement1 = customerStatement(getStatementByMerchantSlot(merchant.merchantId, 1));
   if (!statement1) {
     json(res, 400, { error: "Your first statement must be saved before a second analysis can start." });
     return;
@@ -1258,7 +1258,9 @@ async function handleAuthenticatedJob(req: IncomingMessage, res: ServerResponse,
     json(res, 404, { error: "Job not found" });
     return;
   }
-  const statement = job.status === "completed" ? getStatementBySourceJobIdForMerchant(job.id, merchant.merchantId) : null;
+  const status = customerJobStatus(job);
+  const statement = status === "completed"
+    ? customerStatement(getStatementBySourceJobIdForMerchant(job.id, merchant.merchantId)) : null;
   const redirectTo =
     statement && statement.slot === 2 && getComparisonForMerchant(merchant.merchantId)
       ? "/dashboard/comparison"
@@ -1271,14 +1273,14 @@ async function handleAuthenticatedJob(req: IncomingMessage, res: ServerResponse,
     fileName: job.fileName,
     businessType: job.businessType,
     detectedStatementPeriod: merchantPeriodLabel(job.detectedStatementPeriod),
-    status: job.status,
+    status,
     progress: job.progress,
     attemptCount: job.attemptCount,
     maxAttempts: job.maxAttempts,
     nextRunAt: job.nextRunAt,
-    error: job.error,
+    error: customerJobError(job),
     summary: toPublicReportSummary(job.summary),
-    customerReport: job.summary
+    customerReport: job.summary && customerFinancialsAuthorized(job.summary)
       ? buildSingleStatementCustomerReport({
           kind: "single_statement_result",
           analysis: job.summary,
@@ -1353,7 +1355,9 @@ async function handleDevBypassCounter(res: ServerResponse, merchant: Authenticat
 
 async function handleComparisonData(res: ServerResponse, merchant: AuthenticatedContext): Promise<void> {
   const context = getMerchantDashboardContext(merchant.merchantId);
-  if (!context?.statement1 || !context.statement2 || !context.comparison) {
+  if (!context?.statement1 || !context.statement2 || !context.comparison
+    || !customerFinancialsAuthorized(context.statement1.analysisSummary)
+    || !customerFinancialsAuthorized(context.statement2.analysisSummary)) {
     json(res, 404, { error: "Two completed statements are required before comparison is available." });
     return;
   }
@@ -1437,13 +1441,14 @@ async function handleComparisonData(res: ServerResponse, merchant: Authenticated
 }
 
 async function handleDashboardReportData(res: ServerResponse, merchant: AuthenticatedContext): Promise<void> {
-  const statement1 = getStatementByMerchantSlot(merchant.merchantId, 1);
+  const statement1 = customerStatement(getStatementByMerchantSlot(merchant.merchantId, 1));
   if (!statement1) {
     json(res, 404, { error: "No saved statement was found for this account yet." });
     return;
   }
   const publicSummary = toPublicReportSummary(statement1.analysisSummary);
-  const statementCount = getStatementsForMerchant(merchant.merchantId).length;
+  const statementCount = getAuthorizedStatementsForMerchant(merchant.merchantId).length;
+  const storedStatementCount = getStatementsForMerchant(merchant.merchantId).length;
   const customerReport = buildSingleStatementCustomerReport({
     kind: "single_statement_result",
     analysis: statement1.analysisSummary,
@@ -1456,7 +1461,7 @@ async function handleDashboardReportData(res: ServerResponse, merchant: Authenti
       firstName: merchant.firstName,
       lastName: merchant.lastName,
       initials: merchant.initials,
-      freeStatementsRemaining: Math.max(0, MAX_COMPLETED_STATEMENTS_PER_MERCHANT - statementCount),
+      freeStatementsRemaining: Math.max(0, MAX_COMPLETED_STATEMENTS_PER_MERCHANT - storedStatementCount),
       statementCount,
       statementLimit: MAX_COMPLETED_STATEMENTS_PER_MERCHANT,
       devMode: merchant.devMode,
@@ -1487,8 +1492,14 @@ async function handleStatementReportData(res: ServerResponse, merchant: Authenti
     json(res, 404, { error: "Statement not found." });
     return;
   }
+  if (!customerFinancialsAuthorized(statement.analysisSummary)) {
+    json(res, 409, { error: CUSTOMER_UNAVAILABLE_MESSAGE,
+      statement: statementSummaryPayload(statement) });
+    return;
+  }
   const publicSummary = toPublicReportSummary(statement.analysisSummary);
-  const statementCount = getStatementsForMerchant(merchant.merchantId).length;
+  const statementCount = getAuthorizedStatementsForMerchant(merchant.merchantId).length;
+  const storedStatementCount = getStatementsForMerchant(merchant.merchantId).length;
   const customerReport = buildSingleStatementCustomerReport({
     kind: "single_statement_result",
     analysis: statement.analysisSummary,
@@ -1501,7 +1512,7 @@ async function handleStatementReportData(res: ServerResponse, merchant: Authenti
       firstName: merchant.firstName,
       lastName: merchant.lastName,
       initials: merchant.initials,
-      freeStatementsRemaining: Math.max(0, MAX_COMPLETED_STATEMENTS_PER_MERCHANT - statementCount),
+      freeStatementsRemaining: Math.max(0, MAX_COMPLETED_STATEMENTS_PER_MERCHANT - storedStatementCount),
       statementCount,
       statementLimit: MAX_COMPLETED_STATEMENTS_PER_MERCHANT,
       devMode: merchant.devMode,
@@ -1522,12 +1533,13 @@ async function handleStatementReportData(res: ServerResponse, merchant: Authenti
 }
 
 async function handleStatementUploadContext(res: ServerResponse, merchant: AuthenticatedContext): Promise<void> {
-  const statement1 = getStatementByMerchantSlot(merchant.merchantId, 1);
+  const statement1 = customerStatement(getStatementByMerchantSlot(merchant.merchantId, 1));
   if (!statement1) {
     json(res, 404, { error: "Your first statement has not been saved yet." });
     return;
   }
-  const statementCount = getStatementsForMerchant(merchant.merchantId).length;
+  const statementCount = getAuthorizedStatementsForMerchant(merchant.merchantId).length;
+  const storedStatementCount = getStatementsForMerchant(merchant.merchantId).length;
 
   const firstStatement = {
     period: merchantPeriodLabel(statement1.statementPeriod) ?? statement1.statementPeriod,
@@ -1544,7 +1556,7 @@ async function handleStatementUploadContext(res: ServerResponse, merchant: Authe
       firstName: merchant.firstName,
       lastName: merchant.lastName,
       initials: merchant.initials,
-      freeStatementsRemaining: Math.max(0, MAX_COMPLETED_STATEMENTS_PER_MERCHANT - statementCount),
+      freeStatementsRemaining: Math.max(0, MAX_COMPLETED_STATEMENTS_PER_MERCHANT - storedStatementCount),
       statementCount,
       statementLimit: MAX_COMPLETED_STATEMENTS_PER_MERCHANT,
       devMode: merchant.devMode,
@@ -1574,11 +1586,11 @@ async function handleAnonymousJobLookup(req: IncomingMessage, res: ServerRespons
     id: job.id,
     fileName: job.fileName,
     businessType: job.businessType,
-    status: job.status,
+    status: customerJobStatus(job),
     progress: job.progress,
-    error: job.error,
+    error: customerJobError(job),
     summary: toPublicReportSummary(job.summary),
-    customerReport: job.summary
+    customerReport: job.summary && customerFinancialsAuthorized(job.summary)
       ? buildSingleStatementCustomerReport({
           kind: "single_statement_result",
           analysis: job.summary,
@@ -1824,7 +1836,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (method === "GET" && pathname === "/dashboard/report") {
     const merchant = await requireMerchantPage(req, res);
     if (!merchant) return;
-    const statement1 = getStatementByMerchantSlot(merchant.merchantId, 1);
+    const statement1 = customerStatement(getStatementByMerchantSlot(merchant.merchantId, 1));
     if (!statement1) {
       redirect(res, "/");
       return;
@@ -1850,7 +1862,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const merchant = await requireMerchantPage(req, res);
     if (!merchant) return;
     const statement = getStatementByIdForMerchant(Number(statementReportPageMatch[1]), merchant.merchantId);
-    if (!statement) {
+    if (!customerStatement(statement)) {
       redirect(res, "/dashboard/report");
       return;
     }
@@ -1861,7 +1873,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (method === "GET" && pathname === "/dashboard/statements/upload") {
     const merchant = await requireMerchantPage(req, res);
     if (!merchant) return;
-    const statement1 = getStatementByMerchantSlot(merchant.merchantId, 1);
+    const statement1 = customerStatement(getStatementByMerchantSlot(merchant.merchantId, 1));
     if (!statement1) {
       redirect(res, "/dashboard/report");
       return;

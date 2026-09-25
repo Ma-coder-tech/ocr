@@ -1,5 +1,6 @@
 import type { AnalysisSummary, ChecklistBucket, PublicChecklistReport, PublicReportSummary } from "./types.js";
 import { toPeriodLabel } from "./periods.js";
+import { customerFinancialsAuthorized } from "./customerFinancialAuthority.js";
 
 const PUBLIC_CHECKLIST_FINDING_LIMIT = 8;
 const PUBLIC_CHECKLIST_FINDINGS_PER_BUCKET = 4;
@@ -68,7 +69,7 @@ function toPublicChecklistReport(summary: AnalysisSummary): PublicChecklistRepor
 }
 
 export function toPublicReportSummary(summary?: AnalysisSummary): PublicReportSummary | undefined {
-  if (!summary) return undefined;
+  if (!summary || !customerFinancialsAuthorized(summary)) return undefined;
   return {
     businessType: summary.businessType,
     processorName: summary.processorName,

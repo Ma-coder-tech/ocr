@@ -103,7 +103,9 @@ function depsFor(statementsByFile: Record<string, ComparisonStatementInput>) {
       _document: any,
       _businessType: BusinessTypeId,
       options: { sourceFileName: string },
-    ) => ({ __sourceFileName: options.sourceFileName }) as unknown as AnalysisSummary,
+    ) => ({ __sourceFileName: options.sourceFileName, sourceType: "pdf",
+      parserDecision: { status: "accepted", reportable: true, confidence: "high",
+        reason: "fixture", validationState: { customerFacingTotalsAllowed: true } } }) as unknown as AnalysisSummary,
     adaptStatement: (summary: AnalysisSummary) => {
       const fileName = (summary as any).__sourceFileName;
       const statement = statementsByFile[fileName];
@@ -129,6 +131,19 @@ describe("runMultiStatementAnalysis", () => {
   afterEach(() => {
     dbModule.db.close();
     delete process.env.FEECLEAR_DB_PATH;
+  });
+
+  it("rejects a nonreportable result before an injected comparison adapter can run", async () => {
+    const deps = depsFor({ "nov.pdf": comparisonInput("2024-11") });
+    const adaptStatement = vi.fn(deps.adaptStatement);
+    const result = await orchestrator.runMultiStatementAnalysis({
+      businessType: BUSINESS_TYPE, files: [uploadFile("nov.pdf")], narrative: { enabled: false },
+    }, { ...deps, adaptStatement, analyzeStatement: async () => ({ sourceType: "pdf",
+      parserDecision: { reportable: false, validationState: { customerFacingTotalsAllowed: false } },
+    }) as AnalysisSummary });
+    expect(result.status).toBe("failed");
+    expect(adaptStatement).not.toHaveBeenCalled();
+    expect(store.getComparisonInputsForJob(result.jobId)).toHaveLength(0);
   });
 
   it("can create a queued job first and process that existing job later", async () => {

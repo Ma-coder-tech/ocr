@@ -1,4 +1,5 @@
 import type { AnalysisSummary, DataQualitySignal, FeeBreakdownRow } from "./types.js";
+import { requireCustomerFinancialAuthority } from "./customerFinancialAuthority.js";
 
 export type ComparisonMerchantIdentity = {
   id: string | null;
@@ -603,6 +604,7 @@ export function buildComparisonStatementInput(
   summary: AnalysisSummary,
   options: BuildComparisonStatementInputOptions = {},
 ): ComparisonStatementInput {
+  requireCustomerFinancialAuthority(summary);
   const analysisRecord = analysis(summary);
   const financials = buildFinancials(summary, analysisRecord);
   const processorControlledTotal = processorControlledTotalFrom(analysisRecord);
