@@ -83,6 +83,7 @@ function migrate(): void {
       next_run_at TEXT,
       error TEXT,
       summary_json TEXT,
+      phase2_fee_audit_json TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -656,6 +657,7 @@ function migrate(): void {
   ensureColumn("analysis_jobs", "attempt_count", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn("analysis_jobs", "max_attempts", "INTEGER NOT NULL DEFAULT 3");
   ensureColumn("analysis_jobs", "next_run_at", "TEXT");
+  ensureColumn("analysis_jobs", "phase2_fee_audit_json", "TEXT");
   ensureColumn("canonical_analysis_runs", "rf_snapshot_hash", "TEXT NOT NULL DEFAULT ''");
   ensureColumn("canonical_analysis_runs", "synthesis_contract_id",
     "TEXT NOT NULL DEFAULT 'canonical_synthesis_admission_contract_v1'");

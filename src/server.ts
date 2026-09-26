@@ -57,13 +57,15 @@ import { parsePdf } from "./parser.js";
 import { detectPreflightFailure } from "./preflight.js";
 import { toPublicReportSummary } from "./publicReport.js";
 import { customerFinancialsAuthorized, CUSTOMER_UNAVAILABLE_MESSAGE } from "./customerFinancialAuthority.js";
+import { publicPhase2FeeFactForJob } from "./phase2FeeFact.js";
 import { customerJobError, customerJobStatus,
   customerStatementSummaryPayload as statementSummaryPayload } from "./customerFinancialProjection.js";
 import { buildSingleStatementCustomerReport } from "./reporting/index.js";
 import { buildSingleStatementReportV1, buildUnableToAnalyzeReportV1 } from "./reporting/v1/index.js";
 import type { SingleStatementReportV1 } from "./reporting/v1/index.js";
 import { renderMultiStatementGlobalReportMarkdown } from "./reporting/buildMultiStatement.js";
-import { createJob, getJob, getJobByUploadId, listEvents, listStatementJobsForMerchant, pruneJobs, updateJob } from "./store.js";
+import { createJob, getJob, getJobByUploadId, hasReplayablePhase2FeeAuditForFile,
+  listEvents, listStatementJobsForMerchant, pruneJobs, updateJob } from "./store.js";
 import { enqueueJob, hydrateQueuedJobs } from "./worker.js";
 import { hydrateCanonicalAnalysisRecoveryIntents } from "./canonical/v2/runtime/adaptiveRecoveryWorker.js";
 import { hydrateCanonicalRgOperationReconciliationIntents } from "./canonical/v2/runtime/rgOperationReconciliationWorker.js";
@@ -485,7 +487,7 @@ async function cleanupOldFiles(dir: string, retentionHours: number): Promise<voi
       const filePath = path.join(dir, entry.name);
       try {
         const stats = await fs.stat(filePath);
-        if (stats.mtimeMs < cutoffMs) {
+        if (stats.mtimeMs < cutoffMs && !hasReplayablePhase2FeeAuditForFile(filePath)) {
           await fs.unlink(filePath);
         }
       } catch (e) {
@@ -935,12 +937,13 @@ async function handleSignOut(req: IncomingMessage, res: ServerResponse): Promise
 }
 
 function isProcessingJobStatus(status: Job["status"]): boolean {
-  return status !== "completed" && status !== "failed";
+  return status !== "completed" && status !== "fee_fact_available" && status !== "failed";
 }
 
 function statementJobPayload(job: Job): Record<string, unknown> {
   const publicStatus = customerJobStatus(job);
-  const status = publicStatus === "failed" ? "failed" : isProcessingJobStatus(publicStatus) ? "processing" : "completed";
+  const status = publicStatus === "failed" ? "failed" : publicStatus === "fee_fact_available"
+    ? "partial" : isProcessingJobStatus(publicStatus) ? "processing" : "completed";
   return {
     kind: "job",
     id: `job:${job.id}`,
@@ -949,10 +952,11 @@ function statementJobPayload(job: Job): Record<string, unknown> {
     slot: job.statementSlot,
     period: merchantPeriodLabel(job.detectedStatementPeriod) ?? job.detectedStatementPeriod ?? "Statement period pending",
     periodKey: job.detectedStatementPeriod,
-    processorName: "Analysis pending",
+    processorName: status === "partial" ? "Not attributed" : "Analysis pending",
     businessType: getBusinessTypeReportLabel(job.businessType),
     totalVolume: null,
     totalFees: null,
+    phase2FeeFact: publicPhase2FeeFactForJob(job),
     effectiveRate: null,
     analysisStatus: status,
     jobStatus: publicStatus,
@@ -1280,6 +1284,7 @@ async function handleAuthenticatedJob(req: IncomingMessage, res: ServerResponse,
     nextRunAt: job.nextRunAt,
     error: customerJobError(job),
     summary: toPublicReportSummary(job.summary),
+    phase2FeeFact: publicPhase2FeeFactForJob(job),
     customerReport: job.summary && customerFinancialsAuthorized(job.summary)
       ? buildSingleStatementCustomerReport({
           kind: "single_statement_result",
@@ -1590,6 +1595,7 @@ async function handleAnonymousJobLookup(req: IncomingMessage, res: ServerRespons
     progress: job.progress,
     error: customerJobError(job),
     summary: toPublicReportSummary(job.summary),
+    phase2FeeFact: publicPhase2FeeFactForJob(job),
     customerReport: job.summary && customerFinancialsAuthorized(job.summary)
       ? buildSingleStatementCustomerReport({
           kind: "single_statement_result",

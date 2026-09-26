@@ -22,8 +22,18 @@ if (requestedArgs.length > 0 && !repositoryPrefix) {
     throw new Error(`Test shard ${shardIndex}/${shardCount} selected no files.`);
   }
 
-  const ordinaryFiles = selectedFiles.filter((file) => file !== "test/evaluationPackage5BIntegration.test.ts");
+  // Native-backed corpus/runtime tests require a fresh process at their existing timeouts.
+  const timeoutSensitiveFiles = [
+    "test/canonical/canonicalFeeSemanticsHighValueAliasQualification.test.ts",
+    "test/canonical/governedMastercardFocusedEvidence2024_2026Corpus.test.ts",
+    "test/canonical/v2/runtime/adaptiveExecution.test.ts",
+  ];
+  const ordinaryFiles = selectedFiles.filter((file) => file !== "test/evaluationPackage5BIntegration.test.ts"
+    && !timeoutSensitiveFiles.includes(file));
   const batches = chunk(ordinaryFiles, batchSize);
+  for (const file of timeoutSensitiveFiles) {
+    if (selectedFiles.includes(file)) batches.push([file]);
+  }
   if (selectedFiles.includes("test/evaluationPackage5BIntegration.test.ts")) {
     batches.push(["test/evaluationPackage5BIntegration.test.ts"]);
   }

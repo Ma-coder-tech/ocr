@@ -1,6 +1,7 @@
 import type { BusinessTypeId } from "./businessTypes.js";
 import type { ParserDecision } from "./parserFoundation.js";
 import type { ProcessorDetection } from "./processorDetection.js";
+import type { Phase2FeeAudit } from "./phase2FeeFact.js";
 
 export type StatementSlot = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
 export const STATEMENT_SLOT_VALUES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const satisfies readonly StatementSlot[];
@@ -21,6 +22,7 @@ export type JobStatus =
   | "calculating_effective_rate"
   | "comparing_to_benchmark"
   | "completed"
+  | "fee_fact_available"
   | "failed";
 
 export const JOB_STATUS_VALUES = [
@@ -31,10 +33,11 @@ export const JOB_STATUS_VALUES = [
   "calculating_effective_rate",
   "comparing_to_benchmark",
   "completed",
+  "fee_fact_available",
   "failed",
 ] as const satisfies readonly JobStatus[];
 
-export type Stage = Exclude<JobStatus, "queued" | "completed" | "failed">;
+export type Stage = Exclude<JobStatus, "queued" | "completed" | "fee_fact_available" | "failed">;
 
 export type JobEvent = {
   at: string;
@@ -873,4 +876,5 @@ export type Job = {
   events: JobEvent[];
   error?: string;
   summary?: AnalysisSummary;
+  phase2FeeAudit?: Phase2FeeAudit | null;
 };
