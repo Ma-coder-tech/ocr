@@ -3,13 +3,20 @@ import type { Job } from "./types.js";
 import { getBusinessTypeReportLabel } from "./businessTypes.js";
 import { toPeriodLabel } from "./periods.js";
 import { customerFinancialsAuthorized, CUSTOMER_UNAVAILABLE_MESSAGE } from "./customerFinancialAuthority.js";
+import { publicPhase2FeeFactForJob } from "./phase2FeeFact.js";
 
 export function customerJobStatus(job: Job): Job["status"] {
+  if (job.status === "fee_fact_available") {
+    return publicPhase2FeeFactForJob(job) ? "fee_fact_available" : "failed";
+  }
   return job.status === "completed" && !customerFinancialsAuthorized(job.summary)
     ? "failed" : job.status;
 }
 
 export function customerJobError(job: Job): string | undefined {
+  if (job.status === "fee_fact_available") {
+    return publicPhase2FeeFactForJob(job) ? undefined : CUSTOMER_UNAVAILABLE_MESSAGE;
+  }
   return (job.status === "completed" || Boolean(job.summary)) && !customerFinancialsAuthorized(job.summary)
     ? CUSTOMER_UNAVAILABLE_MESSAGE : job.error;
 }

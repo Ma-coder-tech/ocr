@@ -101,6 +101,24 @@
         `;
       }
 
+      function renderFeeFact(fact) {
+        const amount = `${fact.printedCurrencySymbol}${(fact.displayChargeMagnitudeMinor / 100).toLocaleString("en-US", {
+          minimumFractionDigits: 2, maximumFractionDigits: 2,
+        })}`;
+        page.innerHTML = `
+          <div class="eyebrow">One verified statement fact</div>
+          <h1>Processing fee charges shown on this statement</h1>
+          <p class="lead-value">${escapeHtml(amount)}</p>
+          <p class="body-copy">This is one charge amount verified from the statement’s fee section and summary.
+            A full processing cost analysis is unavailable for this statement.</p>
+          <p class="file-meta">Statement period shown: ${escapeHtml(fact.printedStatementPeriod.start)} to
+            ${escapeHtml(fact.printedStatementPeriod.end)}. The dates when individual fees were earned or posted are not established.</p>
+          <div class="button-row" style="margin-top: 18px;">
+            <a class="secondary-btn" href="/dashboard/statements">Back to statements</a>
+          </div>
+        `;
+      }
+
       async function loadContext() {
         const data = await fetchJson("/api/dashboard/statements/upload-context");
         const statementCount = Number(data.merchant.statementCount || data.statements?.length || 1);
@@ -123,6 +141,10 @@
           }
           if (job.status === "failed") {
             renderFailure(job.error || "The analysis failed.");
+            return;
+          }
+          if (job.status === "fee_fact_available" && job.phase2FeeFact) {
+            renderFeeFact(job.phase2FeeFact);
             return;
           }
           render(job, merchant);

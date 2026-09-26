@@ -18,6 +18,7 @@ export type JobStatus =
   | "calculating_effective_rate"
   | "comparing_to_benchmark"
   | "completed"
+  | "fee_fact_available"
   | "failed";
 
 export type BenchmarkStatus = "above" | "within" | "below";
@@ -128,6 +129,17 @@ export type JobResponse = {
   summary: PublicSummary | null;
   customerReport: CustomerReportDTO | null;
   reportV1?: unknown | null;
+  phase2FeeFact?: PublicPhase2FeeFact | null;
+};
+
+export type PublicPhase2FeeFact = {
+  kind: "printed_processing_fee_charge_aggregate_v1";
+  permissionVersion: "phase2_printed_fee_charge_permission_v1";
+  displayChargeMagnitudeMinor: number;
+  printedCurrencySymbol: "$";
+  printedStatementPeriod: { start: string; end: string };
+  scope: "bounded_declared_processing_fee_charge_aggregate";
+  completeFeeOccurrenceInventory: false;
 };
 
 export type ResultsViewModel = {

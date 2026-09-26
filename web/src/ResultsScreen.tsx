@@ -8,6 +8,7 @@ import {
   Mail,
 } from "lucide-react";
 import { useMemo } from "react";
+import { Phase2FeeFactCard } from "./Phase2FeeFactResult";
 import {
   buildResultsViewModel,
   formatMoney0,
@@ -72,6 +73,8 @@ export function ResultsScreen({ job, selectedBusinessLabel, onStartOver }: Resul
           ) : null}
         </div>
       </div>
+
+      {job.phase2FeeFact ? <Phase2FeeFactCard fact={job.phase2FeeFact} /> : null}
 
       {report.pricing ? (
         <section className={`pricing-card ${report.pricing.tone}`} aria-labelledby="pricing-title">

@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { type ChangeEvent, type DragEvent, useEffect, useMemo, useRef, useState } from "react";
 import { ResultsScreen } from "./ResultsScreen";
+import { Phase2FeeFactResult } from "./Phase2FeeFactResult";
 import type { BusinessTypeId, JobResponse, JobStatus } from "./reportAdapter";
 import { ReportV1Gallery } from "./report-v1/ReportV1Gallery";
 import { ReportV1Gate } from "./report-v1/ReportV1Gate";
@@ -143,6 +144,7 @@ const statusCopy: Record<JobStatus, string> = {
   calculating_effective_rate: "Calculating fees as a percentage of sales",
   comparing_to_benchmark: "Comparing against benchmarks",
   completed: "Analysis complete",
+  fee_fact_available: "One statement fact available",
   failed: "Analysis failed",
 };
 
@@ -166,6 +168,7 @@ export function App() {
   const hasStarted = jobStatus !== "idle";
   const canAnalyze = Boolean(file && selectedBusiness && !hasStarted);
   const showResults = jobStatus === "completed" && Boolean(job?.summary && job.customerReport);
+  const showPhase2Only = jobStatus === "fee_fact_available" && Boolean(job?.phase2FeeFact);
   const showV1Result = Boolean(job?.reportV1 && guardSingleStatementReportV1(job.reportV1).ok && (jobStatus === "completed" || jobStatus === "failed"));
   const showDevGallery = import.meta.env.DEV && window.location.hash === "#report-v1-gallery";
 
@@ -264,7 +267,7 @@ export function App() {
 
       setJob(payload);
       setJobStatus(payload.status);
-      setJobProgress(Math.max(payload.progress, payload.status === "completed" ? 100 : 14));
+      setJobProgress(Math.max(payload.progress, payload.status === "completed" || payload.status === "fee_fact_available" ? 100 : 14));
 
       if (payload.status === "failed") {
         if (payload.reportV1 && guardSingleStatementReportV1(payload.reportV1).ok) return;
@@ -272,7 +275,7 @@ export function App() {
         return;
       }
 
-      if (payload.status !== "completed") {
+      if (payload.status !== "completed" && payload.status !== "fee_fact_available") {
         pollTimerRef.current = window.setTimeout(() => pollJob(jobId), 1200);
       }
     } catch (caught) {
@@ -293,7 +296,7 @@ export function App() {
           <span className="brand-mark">R</span>
           <span>RateReveal</span>
         </a>
-        {showResults ? (
+        {showResults || showPhase2Only ? (
           <button className="signin-link nav-button" type="button" onClick={resetAnalysis}>
             Start over
           </button>
@@ -304,7 +307,9 @@ export function App() {
         )}
       </nav>
 
-      {(showResults || showV1Result) && job ? (
+      {showPhase2Only && job?.phase2FeeFact ? (
+        <Phase2FeeFactResult fact={job.phase2FeeFact} onStartOver={resetAnalysis} />
+      ) : (showResults || showV1Result) && job ? (
         <ReportV1Gate reportV1={job.reportV1} onStartOver={resetAnalysis}>
           {showResults ? <ResultsScreen job={job} selectedBusinessLabel={selectedBusiness?.benchmarkLabel ?? null} onStartOver={resetAnalysis} /> : null}
         </ReportV1Gate>

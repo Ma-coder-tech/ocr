@@ -1,7 +1,9 @@
 import "dotenv/config";
 import { setTimeout as delay } from "node:timers/promises";
+import { readFile } from "node:fs/promises";
 import { createOrReplaceComparison, getAuthorizedStatementsForMerchant, persistStatementFromSummary } from "./accountStore.js";
 import { customerFinancialsAuthorized, CUSTOMER_UNAVAILABLE_MESSAGE } from "./customerFinancialAuthority.js";
+import { evaluatePhase2FeeForNewUpload, phase2FeeEnabled, type Phase2FeeAudit } from "./phase2FeeFact.js";
 import type { AnalysisSummary } from "./types.js";
 import { detectPreflightFailure } from "./preflight.js";
 import {
@@ -82,7 +84,7 @@ async function tick(): Promise<void> {
   const now = Date.now();
   for (const candidate of queue) {
     const job = getJob(candidate);
-    if (!job || job.status === "completed" || job.status === "failed") {
+    if (!job || job.status === "completed" || job.status === "fee_fact_available" || job.status === "failed") {
       queue.delete(candidate);
       continue;
     }
@@ -114,21 +116,22 @@ async function tick(): Promise<void> {
 
 export async function processJob(jobId: string): Promise<void> {
   const queuedJob = getJob(jobId);
-  if (!queuedJob || queuedJob.status === "completed" || queuedJob.status === "failed") return;
+  if (!queuedJob || queuedJob.status === "completed" || queuedJob.status === "fee_fact_available" || queuedJob.status === "failed") return;
   const stageDelayMs = Number(process.env.STAGE_DELAY_MS ?? 0);
 
   try {
     const job = startJobAttempt(jobId);
     if (stageDelayMs > 0) await delay(stageDelayMs);
 
-    const [{ parseCsv, parsePdf }, { analyzeStatementDocumentWithOptionalAi }, { evaluateChecklistReport }] =
+    const [{ parseCsv, parsePdfBytes }, { analyzeStatementDocumentWithOptionalAi }, { evaluateChecklistReport }] =
       await Promise.all([
         import("./parser.js"),
         import("./statementParserOrchestrator.js"),
         import("./checklistEngine.js"),
       ]);
 
-    const parsed = job.fileType === "csv" ? await parseCsv(job.filePath) : await parsePdf(job.filePath, jobId);
+    const pdfBytes = job.fileType === "pdf" ? Uint8Array.from(await readFile(job.filePath)) : null;
+    const parsed = pdfBytes ? await parsePdfBytes(pdfBytes, jobId) : await parseCsv(job.filePath);
     console.log(`[job:${jobId}] parsed`, {
       fileType: job.fileType,
       headers: parsed.headers.slice(0, 8),
@@ -205,11 +208,23 @@ export async function processJob(jobId: string): Promise<void> {
     if (stageDelayMs > 0) await delay(stageDelayMs);
 
     let summary = await analyzeStatementDocumentWithOptionalAi(parsed, job.businessType, { sourceFileName: job.fileName });
+    let phase2FeeAudit: Phase2FeeAudit | null = null;
+    if (pdfBytes && phase2FeeEnabled()) {
+      try {
+        phase2FeeAudit = evaluatePhase2FeeForNewUpload(parsed, pdfBytes);
+      } catch (error) {
+        console.warn(`[job:${jobId}] phase2-fee-proof-withheld`, error instanceof Error ? error.message : error);
+      }
+    }
     if (!customerFinancialsAuthorized(summary)) {
       // Retain the parser observation for internal audit. It cannot complete a
       // customer analysis, enter saved statements, or feed any comparison.
-      updateJob(jobId, { status: "failed", progress: 100, error: CUSTOMER_UNAVAILABLE_MESSAGE,
-        summary, nextRunAt: null }, "Statement requires review; financial output withheld");
+      const feeAvailable = phase2FeeAudit?.decision === "eligible";
+      updateJob(jobId, { status: feeAvailable ? "fee_fact_available" : "failed",
+        progress: 100, error: feeAvailable ? undefined : CUSTOMER_UNAVAILABLE_MESSAGE,
+        summary, phase2FeeAudit, nextRunAt: null },
+      feeAvailable ? "One verified statement fee fact available; full analysis unavailable"
+        : "Statement requires review; financial output withheld");
       return;
     }
     if (isSupportedFiservAnalysis(summary)) {
@@ -330,6 +345,7 @@ export async function processJob(jobId: string): Promise<void> {
         status: "completed",
         progress: 100,
         summary,
+        phase2FeeAudit,
       },
       "Report ready",
     );

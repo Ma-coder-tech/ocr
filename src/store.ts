@@ -35,6 +35,11 @@ function mapJob(row: Record<string, unknown> | undefined): Job | undefined {
       summary = undefined;
     }
   }
+  let phase2FeeAudit: Job["phase2FeeAudit"] = null;
+  if (row.phase2_fee_audit_json) {
+    try { phase2FeeAudit = JSON.parse(String(row.phase2_fee_audit_json)) as Job["phase2FeeAudit"]; }
+    catch { phase2FeeAudit = null; }
+  }
 
   return {
     id: String(row.id),
@@ -60,19 +65,20 @@ function mapJob(row: Record<string, unknown> | undefined): Job | undefined {
     nextRunAt: row.next_run_at ? String(row.next_run_at) : null,
     error: row.error ? String(row.error) : undefined,
     summary,
+    phase2FeeAudit,
     events: listEvents(String(row.id)),
   };
 }
 
 function isTerminal(status: JobStatus): boolean {
-  return status === "completed" || status === "failed";
+  return status === "completed" || status === "fee_fact_available" || status === "failed";
 }
 
 export function pruneJobs(): void {
   const cutoffIso = new Date(Date.now() - TERMINAL_JOB_RETENTION_HOURS * 60 * 60 * 1000).toISOString();
   db.prepare(`
     DELETE FROM analysis_jobs
-    WHERE status IN ('completed', 'failed')
+    WHERE status IN ('completed', 'fee_fact_available', 'failed')
       AND updated_at < ?
       AND merchant_id IS NULL
   `).run(cutoffIso);
@@ -132,6 +138,19 @@ export function getJobByUploadId(uploadId: string): Job | undefined {
   return mapJob(row);
 }
 
+/** Keep the immutable PDF while an emitted fee fact's job audit is retained. */
+export function hasReplayablePhase2FeeAuditForFile(filePath: string): boolean {
+  const rows = db.prepare(`SELECT phase2_fee_audit_json FROM analysis_jobs
+    WHERE file_path = ? AND status IN ('completed', 'fee_fact_available')
+      AND phase2_fee_audit_json IS NOT NULL`).all(filePath) as Array<{ phase2_fee_audit_json: string }>;
+  return rows.some((row) => {
+    try {
+      const audit = JSON.parse(row.phase2_fee_audit_json) as Job["phase2FeeAudit"];
+      return audit?.decision === "eligible";
+    } catch { return false; }
+  });
+}
+
 export function listStatementJobsForMerchant(merchantId: number): Job[] {
   const rows = db
     .prepare(`
@@ -167,6 +186,7 @@ export function updateJob(
       | "progress"
       | "error"
       | "summary"
+      | "phase2FeeAudit"
       | "detectedStatementPeriod"
       | "merchantId"
       | "statementSlot"
@@ -187,6 +207,7 @@ export function updateJob(
   const nextProgress = patch.progress ?? current.progress;
   const nextError = hasOwn(patch, "error") ? patch.error ?? null : current.error ?? null;
   const nextSummary = hasOwn(patch, "summary") ? patch.summary : current.summary;
+  const nextPhase2FeeAudit = hasOwn(patch, "phase2FeeAudit") ? patch.phase2FeeAudit : current.phase2FeeAudit;
   const nextUploadId = patch.uploadId !== undefined ? patch.uploadId : current.uploadId ?? null;
   const nextDetectedStatementPeriod =
     patch.detectedStatementPeriod !== undefined ? patch.detectedStatementPeriod : current.detectedStatementPeriod ?? null;
@@ -202,7 +223,7 @@ export function updateJob(
   db.prepare(`
     UPDATE analysis_jobs
     SET upload_id = ?, merchant_id = ?, statement_slot = ?, replace_statement_id = ?, detected_statement_period = ?,
-        status = ?, progress = ?, attempt_count = ?, max_attempts = ?, next_run_at = ?, error = ?, summary_json = ?, updated_at = ?
+        status = ?, progress = ?, attempt_count = ?, max_attempts = ?, next_run_at = ?, error = ?, summary_json = ?, phase2_fee_audit_json = ?, updated_at = ?
     WHERE id = ?
   `).run(
     nextUploadId,
@@ -217,6 +238,7 @@ export function updateJob(
     nextNextRunAt,
     nextError,
     nextSummary ? JSON.stringify(nextSummary) : null,
+    nextPhase2FeeAudit ? JSON.stringify(nextPhase2FeeAudit) : null,
     updatedAt,
     id,
   );
@@ -250,6 +272,7 @@ export function startJobAttempt(id: string): Job {
       status: "verifying_statement",
       progress: 10,
       error: undefined,
+      phase2FeeAudit: null,
       attemptCount,
       nextRunAt: null,
     },
@@ -319,7 +342,7 @@ export function requeueInterruptedJobs(): number {
     .prepare(`
       SELECT id
       FROM analysis_jobs
-      WHERE status NOT IN ('queued', 'completed', 'failed')
+      WHERE status NOT IN ('queued', 'completed', 'fee_fact_available', 'failed')
       ORDER BY created_at ASC
     `)
     .all() as Array<{ id: string }>;
@@ -332,7 +355,7 @@ export function requeueInterruptedJobs(): number {
   db.prepare(`
     UPDATE analysis_jobs
     SET status = 'queued', progress = 0, error = NULL, next_run_at = NULL, updated_at = ?
-    WHERE status NOT IN ('queued', 'completed', 'failed')
+    WHERE status NOT IN ('queued', 'completed', 'fee_fact_available', 'failed')
   `).run(updatedAt);
 
   const insertEvent = db.prepare(`

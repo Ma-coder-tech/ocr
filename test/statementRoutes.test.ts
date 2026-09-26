@@ -628,4 +628,42 @@ describe("statement dashboard routes", () => {
     expect(legacy.response.status).toBe(302);
     expect(legacy.response.headers.get("location")).toBe(`/dashboard/statements/analyze?job=${encodeURIComponent(job.id)}`);
   });
+
+  it("projects only the isolated fee fact for a new partial job and obeys the kill switch", async () => {
+    const { readFile } = await import("node:fs/promises");
+    const { parsePdfBytes } = await import("../src/parser.js");
+    const { evaluatePhase2FeeForNewUpload, PHASE2_FEE_FLAG } = await import("../src/phase2FeeFact.js");
+    const bytes = await readFile("test/fixtures/pdfs/Nov_2024_Statement.pdf");
+    const audit = evaluatePhase2FeeForNewUpload(await parsePdfBytes(bytes), bytes);
+    const job = store.createJob({ fileName: "Nov_2024_Statement.pdf", filePath: "/tmp/new-upload.pdf",
+      fileType: "pdf", businessType: "retail", merchantId, statementSlot: 2,
+      detectedStatementPeriod: "2024-11" });
+    store.updateJob(job.id, { status: "fee_fact_available", progress: 100,
+      phase2FeeAudit: audit, summary: { ...makeSummary("2024-11"),
+        parserDecision: { status: "needs_review", reportable: false, confidence: "needs_review",
+          reason: "unreconciled", validationState: { customerFacingTotalsAllowed: false,
+            feeClassificationAllowed: false, blockingReasons: ["unreconciled"] } } } as never });
+    process.env[PHASE2_FEE_FLAG] = "true";
+    try {
+      const enabled = await api(`/api/dashboard/jobs/${job.id}`);
+      expect(enabled.payload).toMatchObject({ status: "fee_fact_available",
+        customerReport: null, statement: null,
+        phase2FeeFact: { displayChargeMagnitudeMinor: 133096,
+          completeFeeOccurrenceInventory: false } });
+      expect(enabled.payload.reportV1).toBeNull();
+      expect(enabled.payload).not.toHaveProperty("summary");
+      expect(JSON.stringify(enabled.payload)).not.toMatch(/"totalFees":1330\.96|"effectiveRate":2\.5|estimatedAnnualSavings/);
+      process.env[PHASE2_FEE_FLAG] = "false";
+      const disabled = await api(`/api/dashboard/jobs/${job.id}`);
+      expect(disabled.payload).toMatchObject({ status: "failed", phase2FeeFact: null,
+        customerReport: null, statement: null });
+      expect(disabled.payload).not.toHaveProperty("summary");
+      process.env[PHASE2_FEE_FLAG] = "true";
+      const restored = await api(`/api/dashboard/jobs/${job.id}`);
+      expect(restored.payload.status).toBe("fee_fact_available");
+      expect(restored.payload.phase2FeeFact.displayChargeMagnitudeMinor).toBe(133096);
+    } finally {
+      delete process.env[PHASE2_FEE_FLAG];
+    }
+  });
 });
